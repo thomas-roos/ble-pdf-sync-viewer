@@ -1,6 +1,6 @@
-# BLE PDF Sync
+# PDF Sync Viewer
 
-A Bluetooth Low Energy (BLE) PDF synchronization app for Android devices. This project enables synchronized PDF viewing between Android devices using BLE communication.
+This project enables synchronized PDF viewing between Android devices first using BLE communication. But also thinking of RTPMIDI or other options.
 
 ## 🚀 Quick Start
 
