@@ -77,12 +77,9 @@ class MainActivity : AppCompatActivity() {
                     val uriToOpen = pdfFiles.find { uri -> getFileName(uri)?.startsWith(pdfName, ignoreCase = true) == true }
                     if (uriToOpen != null) {
                         Log.d(TAG, "Found matching PDF: ${getFileName(uriToOpen)}")
-                        val newIndex = pdfFiles.indexOf(uriToOpen)
-                        // Also show if the view is currently not displaying a PDF
-                        if (newIndex != currentPdfIndex || binding.pdfImageView.visibility == View.GONE) {
-                            currentPdfIndex = newIndex
-                            openPdf(uriToOpen)
-                        }
+                        currentPdfIndex = pdfFiles.indexOf(uriToOpen)
+                        // Always open/reload when a valid update is received from the controller
+                        openPdf(uriToOpen)
                     } else {
                         Log.w(TAG, "No local PDF found starting with: $pdfName")
                         binding.pdfImageView.visibility = View.GONE
