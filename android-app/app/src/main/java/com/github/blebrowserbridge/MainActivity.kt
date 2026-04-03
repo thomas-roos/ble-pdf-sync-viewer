@@ -68,24 +68,33 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         bluetoothController = BluetoothController(this)
-        // This is the new, smarter client logic
+        
         bluetoothController.onPdfNameReceived = { pdfName ->
             runOnUiThread {
                 if (!isServer) {
+                    if (pdfName == "server-ready") {
+                        binding.receivedPageText.text = "Connected to server.\nWaiting for PDF broadcast..."
+                        return@runOnUiThread
+                    }
+
                     Log.d(TAG, "Client received PDF name: $pdfName")
                     // Match by the start of the name to handle truncated advertisement data
-                    val uriToOpen = pdfFiles.find { uri -> getFileName(uri)?.startsWith(pdfName, ignoreCase = true) == true }
+                    val uriToOpen = pdfFiles.find { uri -> 
+                        getFileName(uri)?.startsWith(pdfName, ignoreCase = true) == true 
+                    }
+
                     if (uriToOpen != null) {
                         Log.d(TAG, "Found matching PDF: ${getFileName(uriToOpen)}")
                         currentPdfIndex = pdfFiles.indexOf(uriToOpen)
-                        // Always open/reload when a valid update is received from the controller
                         openPdf(uriToOpen)
                     } else {
                         Log.w(TAG, "No local PDF found starting with: $pdfName")
                         binding.pdfImageView.visibility = View.GONE
                         binding.receivedPageText.visibility = View.VISIBLE
-                        binding.receivedPageText.text = "Received: '$pdfName' (File not found locally)"
-                        Toast.makeText(this, "'$pdfName' not found in your selected folder", Toast.LENGTH_SHORT).show()
+                        // Display the received name even if not found locally
+                        binding.receivedPageText.text = "Incoming PDF: \"$pdfName\"\n\n(File not found in your selected folder)"
+                        binding.pageInfo.text = "Missing: $pdfName"
+                        Toast.makeText(this, "File '$pdfName' not found locally", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -203,7 +212,7 @@ class MainActivity : AppCompatActivity() {
         binding.statusText.text = "Status: BLE Client Started"
         binding.pdfImageView.visibility = View.GONE
         binding.receivedPageText.visibility = View.VISIBLE
-        binding.receivedPageText.text = "Client Mode: Waiting for PDF name..."
+        binding.receivedPageText.text = "Client Mode: Waiting for PDF broadcast..."
         Toast.makeText(this, "BLE Client Started", Toast.LENGTH_SHORT).show()
     }
 
