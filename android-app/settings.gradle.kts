@@ -19,3 +19,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "BLE Browser Bridge"
 include(":app")
+include(":midi")

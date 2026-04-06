@@ -45,6 +45,8 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.eventbus)
+    implementation(project(":midi"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)

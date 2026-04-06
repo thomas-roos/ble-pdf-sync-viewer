@@ -29,6 +29,7 @@ import kotlin.math.abs
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var bluetoothController: BluetoothController
+    private lateinit var midiController: MidiController
 
     private var pdfRenderer: PdfRenderer? = null
     private var currentPage: PdfRenderer.Page? = null
@@ -70,11 +71,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        System.setProperty("java.net.preferIPv4Stack", "true")
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        Log.i(tag, "App started - IPv4 Stack Preferred")
+
         bluetoothController = BluetoothController(this)
+        midiController = MidiController(this)
         
         bluetoothController.onPdfNameReceived = { pdfName, pageIndex ->
             runOnUiThread {
@@ -109,6 +114,13 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+        midiController.onPageChangeRequested = { pageIndex ->
+            Log.d(tag, "Page change requested via MIDI: $pageIndex (isServer: $isServer)")
+            runOnUiThread {
+                renderPage(pageIndex)
+            }
+        }
+
         initBluetooth()
         setupUI()
         setupGestures()
@@ -342,6 +354,7 @@ class MainActivity : AppCompatActivity() {
         Log.d(tag, "Starting BLE Server")
         isServer = true
         bluetoothController.startServer()
+        midiController.start()
         binding.statusText.text = getString(R.string.status_server_started)
         
         if (pdfRenderer != null) {
@@ -361,6 +374,7 @@ class MainActivity : AppCompatActivity() {
         Log.d(tag, "Starting BLE Client")
         isServer = false
         bluetoothController.startClient()
+        midiController.start()
         binding.statusText.text = getString(R.string.status_client_started)
         binding.pdfImageView.isVisible = false
         binding.receivedPageText.isVisible = true
@@ -485,6 +499,7 @@ class MainActivity : AppCompatActivity() {
         currentPage?.close()
         pdfRenderer?.close()
         bluetoothController.stop()
+        midiController.stop()
         Log.d(tag, "App destroyed")
     }
 }
