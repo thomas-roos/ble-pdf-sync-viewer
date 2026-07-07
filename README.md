@@ -42,7 +42,7 @@ cd android-app
 - **Android**: Kotlin, BLE Peripheral/Central modes, GATT Server/Client
 - **PDF Viewer**: Android PDF Viewer library
 - **Communication**: Custom GATT service for page synchronization, RTP MIDI (session name: "pdf-sync-viewer")
-- **MIDI Mapping**: Note On / Program Change value maps directly to page index (e.g., Note 5 = Page 5)
+- **MIDI Mapping**: Bank Select + Program Change select the PDF by filename, using the 1-based numbers as displayed in SongBook (bank 14 + program 20 opens `14_20.pdf`). Note On turns to the absolute page within the current PDF (Note 5 = Page 5).
 - **Range**: ~10-30 meters (typical BLE range), or local Network for MIDI
 
 ## 📋 Requirements
@@ -85,21 +85,21 @@ MIT License - see [LICENSE](LICENSE) for details.
 - Restart the app if connection issues persist
 - Use Android Studio logcat for detailed debugging
 
-### Testing RTP MIDI (macOS/Linux)
-If you are on macOS, you can use **Audio MIDI Setup** -> **MIDI Studio** -> **Network** to connect to the "pdf-sync-viewer" session.
+### Testing RTP MIDI
+`test_midi.py` (repo root, no dependencies beyond Python 3) emulates the
+SongBook app: it performs the full AppleMIDI handshake, answers clock sync,
+and sends bank select + program change like SongBook does on song selection.
 
-To test from the command line (Linux/macOS with `sendmidi` installed):
 ```bash
-# Send a Program Change to go to page 5 (assuming device IP is 192.168.1.100)
-sendmidi dev "pdf-sync-viewer" pc 5
+# Jump to page 42 on the device at 192.168.1.100 (app must be in server mode)
+python3 test_midi.py 192.168.1.100 42
+
+python3 test_midi.py 192.168.1.100 42 --simple   # bare program change
+python3 test_midi.py 192.168.1.100 42 --note     # note on instead
 ```
-Or use a tool like `mido` (Python):
-```python
-import mido
-# Note: RTP MIDI usually requires a bridge or specific backend like 'rtmidi'
-with mido.open_output('pdf-sync-viewer') as output:
-    output.send(mido.Message('program_change', program=10)) # Go to page 10
-```
+
+If you are on macOS, you can also use **Audio MIDI Setup** -> **MIDI Studio**
+-> **Network** to connect to the "pdf-sync-viewer" session.
 
 ## 📖 How It Works
 

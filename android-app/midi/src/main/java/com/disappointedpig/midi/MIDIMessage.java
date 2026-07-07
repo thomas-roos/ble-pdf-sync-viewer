@@ -6,15 +6,17 @@ import android.util.Log;
 
 import com.disappointedpig.midi.internal_events.PacketEvent;
 import com.disappointedpig.midi.utility.DataBuffer;
-import com.disappointedpig.midi.utility.DataBufferReader;
 import com.disappointedpig.midi.utility.OutDataBuffer;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class MIDIMessage extends RTPMessage {
 
     private Boolean valid;
     private DataBuffer m;
 
-    private boolean firstHasDeltaTime;
+    private final List<Bundle> commands = new ArrayList<>();
 
     public int command;
     public int channel;
@@ -40,23 +42,65 @@ public class MIDIMessage extends RTPMessage {
 
     public boolean parseMessage(PacketEvent packet) {
         this.valid = false;
+        commands.clear();
         parse(packet);
-        final DataBufferReader reader = new DataBufferReader();
-        final DataBuffer rawPayload = new DataBuffer(payload, payload_length);
 
-        // payload should contain command + journal
-        int block4 = reader.read8(rawPayload);
-        command = block4 >> 4;
-        channel = block4 & 0xf;
-        int block5 = reader.read8(rawPayload);
-        note = block5 & 0x7f;
-        int block6 = reader.read8(rawPayload);
-        velocity = block6 & 0x7f;
+        // Parse the MIDI list (RFC 6295, section 3.2): commands separated by
+        // variable-length delta times, running status allowed after the first
+        // command. Two-byte commands (program change 0xC, channel pressure 0xD)
+        // and three-byte channel commands are supported; system commands (0xF)
+        // terminate parsing.
+        int pos = 0;
+        int runningStatus = 0;
+        boolean deltaTimeExpected = firstCommandHasDeltaTime;
 
-        this.valid = true;
+        while (pos < payload_length) {
+            if (deltaTimeExpected) {
+                while (pos < payload_length && (payload[pos] & 0x80) != 0) {
+                    pos++;
+                }
+                pos++; // final delta-time octet (bit 7 clear)
+                if (pos >= payload_length) break;
+            }
+            deltaTimeExpected = true; // all commands after the first have one
 
-        Log.d("MIDIMessage", "cs:" + command + " c:" + channel + " n:" + note + " v" + velocity);
-        return true;
+            int status = payload[pos] & 0xFF;
+            if ((status & 0x80) != 0) {
+                pos++;
+            } else {
+                status = runningStatus;
+            }
+            int type = status >> 4;
+            if (type < 0x8 || type == 0xF) break;
+            runningStatus = status;
+
+            int dataLength = (type == 0xC || type == 0xD) ? 1 : 2;
+            if (pos + dataLength > payload_length) break;
+            int data1 = payload[pos++] & 0x7F;
+            int data2 = (dataLength == 2) ? (payload[pos++] & 0x7F) : 0;
+
+            Bundle midi = new Bundle();
+            midi.putInt(com.disappointedpig.midi.MIDIConstants.MSG_COMMAND, type);
+            midi.putInt(com.disappointedpig.midi.MIDIConstants.MSG_CHANNEL, status & 0xF);
+            midi.putInt(com.disappointedpig.midi.MIDIConstants.MSG_NOTE, data1);
+            midi.putInt(com.disappointedpig.midi.MIDIConstants.MSG_VELOCITY, data2);
+            commands.add(midi);
+
+            if (commands.size() == 1) {
+                command = type;
+                channel = status & 0xF;
+                note = data1;
+                velocity = data2;
+            }
+            Log.d("MIDIMessage", "cs:" + type + " c:" + (status & 0xF) + " n:" + data1 + " v" + data2);
+        }
+
+        this.valid = !commands.isEmpty();
+        return this.valid;
+    }
+
+    public List<Bundle> getCommands() {
+        return commands;
     }
 
     public Bundle toBundle() {

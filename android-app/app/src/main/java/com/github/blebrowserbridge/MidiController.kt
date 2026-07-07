@@ -16,6 +16,11 @@ class MidiController(private val context: Context) {
     private var midiSession: MIDISession? = null
 
     var onPageChangeRequested: ((Int) -> Unit)? = null
+    var onSongSelectRequested: ((bank: Int, program: Int) -> Unit)? = null
+
+    // Bank select state (CC0 = MSB, CC32 = LSB), applied by the next program change
+    private var bankMsb = 0
+    private var bankLsb = 0
 
     fun start() {
         Log.i(TAG, "Starting MIDI Controller")
@@ -31,6 +36,7 @@ class MidiController(private val context: Context) {
 
         try {
             midiSession = MIDISession.getInstance()
+            midiSession?.setBonjourName("pdf-sync-viewer")
             midiSession?.start(context)
             Log.d(TAG, "MIDI Session started")
         } catch (e: Exception) {
@@ -56,15 +62,18 @@ class MidiController(private val context: Context) {
         val command = event.midi.getInt(MIDIConstants.MSG_COMMAND)
         val note = event.midi.getInt(MIDIConstants.MSG_NOTE)
         val velocity = event.midi.getInt(MIDIConstants.MSG_VELOCITY)
-        
+
         Log.d(TAG, "Received MIDI Event: cmd=$command, note=$note, vel=$velocity")
 
-        // Map MIDI Program Change or Note On to page changes
-        // Note On (0x09) and Program Change (0x0C)
-        if ((command == 0x09 || command == 0x08) && velocity > 0) {
-            onPageChangeRequested?.invoke(note)
-        } else if (command == 0x0C) { // Program Change
-            onPageChangeRequested?.invoke(note)
+        when (command) {
+            0x0B -> when (note) { // Control Change: remember bank select
+                0 -> bankMsb = velocity
+                32 -> bankLsb = velocity
+            }
+            // Program Change selects a song (SongBook sends bank select + program change)
+            0x0C -> onSongSelectRequested?.invoke(bankMsb * 128 + bankLsb, note)
+            // Note On turns to an absolute page within the current PDF
+            0x09, 0x08 -> if (velocity > 0) onPageChangeRequested?.invoke(note)
         }
     }
 }

@@ -520,8 +520,10 @@ public class MIDISession {
             MIDIMessage message = new MIDIMessage();
             message.parseMessage(e);
             if(message.isValid()) {
-                Log.i(TAG, "onPacketEvent: Valid MIDI message received: cmd=" + message.command + " note=" + message.note);
-                EventBus.getDefault().post(new MIDIReceivedEvent(message.toBundle()));
+                for (Bundle midi : message.getCommands()) {
+                    Log.i(TAG, "onPacketEvent: Valid MIDI message received: cmd=" + midi.getInt(MIDIConstants.MSG_COMMAND) + " note=" + midi.getInt(MIDIConstants.MSG_NOTE));
+                    EventBus.getDefault().post(new MIDIReceivedEvent(midi));
+                }
             } else {
                 Log.v(TAG, "onPacketEvent: Packet not recognized as MIDI Control or Message");
             }

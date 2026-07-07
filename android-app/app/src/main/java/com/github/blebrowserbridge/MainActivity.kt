@@ -120,6 +120,22 @@ class MainActivity : AppCompatActivity() {
                 renderPage(pageIndex)
             }
         }
+        midiController.onSongSelectRequested = { bank, program ->
+            // Filenames use the numbers as displayed in SongBook (1-based),
+            // the wire values are 0-based: bank 13 + program 19 -> 14_20.pdf
+            val target = "${bank + 1}_${program + 1}"
+            Log.d(tag, "Song select via MIDI: bank=$bank program=$program -> $target.pdf")
+            runOnUiThread {
+                val uri = pdfFiles.find { getFileName(it)?.substringBeforeLast('.') == target }
+                if (uri != null) {
+                    currentPdfIndex = pdfFiles.indexOf(uri)
+                    openPdf(uri)
+                } else {
+                    Log.w(tag, "No PDF named $target.pdf in folder")
+                    Toast.makeText(this, "No PDF named $target.pdf", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
 
         initBluetooth()
         setupUI()

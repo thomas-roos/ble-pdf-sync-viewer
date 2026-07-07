@@ -19,6 +19,9 @@ public class RTPMessage {
     int ssrc = 0;
     byte[] payload;
     int payload_length;
+    // RFC 6295 MIDI command section header flags
+    boolean journalPresent = false;
+    boolean firstCommandHasDeltaTime = false;
 
     public boolean parse(PacketEvent packet) {
 
@@ -41,15 +44,22 @@ public class RTPMessage {
         this.timestamp = reader.readInteger(rawInput);
         this.ssrc = reader.readInteger(rawInput);
 
+        // MIDI command section header (RFC 6295, section 3):
+        // B = two-octet header with 12-bit LEN, J = journal present,
+        // Z = first command preceded by a delta time, P = phantom status
         int block3 = reader.read8(rawInput);
         boolean bflag = (block3 >> 7 & 1) != 0;
-        boolean jflag = ((block3 >> 6 & 1) & 0x1) != 0;
-        boolean zflag = ((block3 >> 5 & 1) & 0x1) != 0;
-        boolean pflag = ((block3 >> 4 & 1) & 0x1) != 0;
-        int command_length = block3 & 0x7;
+        this.journalPresent = (block3 >> 6 & 1) != 0;
+        this.firstCommandHasDeltaTime = (block3 >> 5 & 1) != 0;
+        int command_length = block3 & 0xF;
+        if (bflag) {
+            command_length = (command_length << 8) | reader.read8(rawInput);
+        }
 
         this.payload = rawInput.slice(rawInput.getStreamPosition());
-        this.payload_length = rawInput.getBytesLength() - rawInput.getStreamPosition();
+        // LEN bounds the MIDI list; anything after it is the recovery journal
+        this.payload_length = Math.min(command_length,
+                rawInput.getBytesLength() - rawInput.getStreamPosition());
         return true;
     }
 
