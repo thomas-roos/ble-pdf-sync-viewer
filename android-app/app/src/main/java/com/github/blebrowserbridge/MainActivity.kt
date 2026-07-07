@@ -20,6 +20,8 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -53,8 +55,17 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val PREF_CROP_MARGINS = "crop_margins"
         private const val PREF_AUTO_HIDE_NAV = "auto_hide_nav"
+        private const val PREF_FILE_EXT = "file_ext"
+        private const val PREF_FOLDER_URI = "folder_uri"
         private const val AUTO_HIDE_DELAY_MS = 4000L
+        private val FILE_EXTENSIONS = listOf("pdf", "jpg")
     }
+
+    private var folderUri: Uri? = null
+    private var isImageDoc = false
+
+    private val fileExt: String
+        get() = getPreferences(MODE_PRIVATE).getString(PREF_FILE_EXT, "pdf") ?: "pdf"
 
     // Auto-hide the reading controls after a few seconds of inactivity
     private val hideControlsHandler = Handler(Looper.getMainLooper())
@@ -79,6 +90,15 @@ class MainActivity : AppCompatActivity() {
         binding.setupControls.isVisible = true
         supportActionBar?.show()
         showSystemUI()
+    }
+
+    // Fullscreen section/sheet display (e.g. "3/15") when no matching
+    // document is available on this device
+    private fun showBigNumber(text: String) {
+        binding.pdfImageView.isVisible = false
+        binding.receivedPageText.isVisible = false
+        binding.bigNumberText.text = text
+        binding.bigNumberText.isVisible = true
     }
 
     private val cropMargins: Boolean
@@ -115,11 +135,9 @@ class MainActivity : AppCompatActivity() {
             result.data?.data?.let { uri ->
                 Log.d(tag, "Folder selected: $uri")
                 contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                listPdfFilesInFolder(uri)
-                if (pdfFiles.isNotEmpty()) {
-                    currentPdfIndex = 0
-                    openPdf(pdfFiles[currentPdfIndex])
-                }
+                getPreferences(MODE_PRIVATE).edit().putString(PREF_FOLDER_URI, uri.toString()).apply()
+                folderUri = uri
+                reloadFolder()
             }
         }
     }
@@ -157,13 +175,11 @@ class MainActivity : AppCompatActivity() {
                         }
                         renderPage(pageIndex)
                     } else {
+                        // Not available locally: show the section/sheet number
+                        // fullscreen (e.g. "3/15" for 3_15.pdf)
                         Log.w(tag, "No local PDF found starting with: $pdfName")
-                        binding.pdfImageView.isVisible = false
-                        binding.receivedPageText.isVisible = true
-                        // Display the received name even if not found locally
-                        binding.receivedPageText.text = getString(R.string.incoming_pdf, pdfName)
+                        showBigNumber(pdfName.substringBeforeLast('.').replace('_', '/'))
                         binding.readingPageInfo.text = getString(R.string.missing_pdf, pdfName)
-                        Toast.makeText(this, "File '$pdfName' not found locally", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -185,8 +201,10 @@ class MainActivity : AppCompatActivity() {
                     currentPdfIndex = pdfFiles.indexOf(uri)
                     openPdf(uri)
                 } else {
+                    // No folder selected or file missing: act as a number
+                    // display so the musician still sees what to play
                     Log.w(tag, "No PDF named $target.pdf in folder")
-                    Toast.makeText(this, "No PDF named $target.pdf", Toast.LENGTH_SHORT).show()
+                    showBigNumber("${bank + 1}/${program + 1}")
                 }
             }
         }
@@ -237,7 +255,7 @@ class MainActivity : AppCompatActivity() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 // Reading mode: tap zones like a music reader - left third is
                 // previous, right third is next, center toggles the controls
-                if (!binding.setupControls.isVisible && pdfRenderer != null) {
+                if (!binding.setupControls.isVisible && (pdfRenderer != null || isImageDoc)) {
                     val width = binding.root.width
                     when {
                         e.x < width / 3f -> navigatePrevPage()
@@ -316,7 +334,41 @@ class MainActivity : AppCompatActivity() {
         binding.autoHideNavCheckbox.setOnCheckedChangeListener { _, isChecked ->
             getPreferences(MODE_PRIVATE).edit().putBoolean(PREF_AUTO_HIDE_NAV, isChecked).apply()
         }
+
+        binding.fileTypeSpinner.adapter = object : ArrayAdapter<String>(
+            this, android.R.layout.simple_spinner_dropdown_item,
+            FILE_EXTENSIONS.map { it.uppercase() }) {
+            // The selected item is rendered on the dark setup panel
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                super.getView(position, convertView, parent).apply {
+                    (this as? android.widget.TextView)?.setTextColor(Color.WHITE)
+                }
+        }
+        binding.fileTypeSpinner.setSelection(FILE_EXTENSIONS.indexOf(fileExt).coerceAtLeast(0))
+        binding.fileTypeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val ext = FILE_EXTENSIONS[position]
+                if (ext != fileExt) {
+                    getPreferences(MODE_PRIVATE).edit().putString(PREF_FILE_EXT, ext).apply()
+                    reloadFolder()
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
         applyDisplayMode()
+
+        // Restore the last selected folder if the permission is still held
+        getPreferences(MODE_PRIVATE).getString(PREF_FOLDER_URI, null)?.let { saved ->
+            val uri = Uri.parse(saved)
+            if (contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }) {
+                folderUri = uri
+                listFilesInFolder(uri)
+                if (pdfFiles.isNotEmpty()) {
+                    currentPdfIndex = 0
+                    openPdf(pdfFiles[currentPdfIndex])
+                }
+            }
+        }
 
         onBackPressedDispatcher.addCallback(this) {
             if (!binding.setupControls.isVisible) {
@@ -329,7 +381,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         // Page-turn pedals typically emulate volume, arrow or page keys
-        if (pdfRenderer != null && !binding.setupControls.isVisible) {
+        if ((pdfRenderer != null || isImageDoc) && !binding.setupControls.isVisible) {
             when (keyCode) {
                 KeyEvent.KEYCODE_VOLUME_DOWN,
                 KeyEvent.KEYCODE_DPAD_RIGHT,
@@ -351,7 +403,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun navigatePrevPage() {
-        if (currentPageIndex > 0) {
+        if (isImageDoc) {
+            navigatePreviousPdf()
+        } else if (currentPageIndex > 0) {
             renderPage(currentPageIndex - 1)
         } else {
             navigatePreviousPdf()
@@ -359,6 +413,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun navigateNextPage() {
+        if (isImageDoc) {
+            navigateNextPdf()
+            return
+        }
         pdfRenderer?.let {
             if (currentPageIndex < it.pageCount - 1) {
                 renderPage(currentPageIndex + 1)
@@ -463,32 +521,76 @@ class MainActivity : AppCompatActivity() {
         pickPdfLauncher.launch(intent)
     }
 
-    private fun listPdfFilesInFolder(folderUri: Uri) {
+    private fun reloadFolder() {
+        val uri = folderUri ?: return
+        listFilesInFolder(uri)
+        if (pdfFiles.isNotEmpty()) {
+            currentPdfIndex = 0
+            openPdf(pdfFiles[currentPdfIndex])
+        } else {
+            Toast.makeText(this, "No .$fileExt files in folder", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun listFilesInFolder(folderUri: Uri) {
+        val wantedMime = if (fileExt == "jpg") "image/jpeg" else "application/pdf"
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folderUri, DocumentsContract.getTreeDocumentId(folderUri))
         val cursor = contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)
 
-        val pdfs = mutableListOf<Uri>()
+        val docs = mutableListOf<Uri>()
         cursor?.use {
             while (it.moveToNext()) {
                 val mimeType = it.getString(it.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE))
-                if (mimeType == "application/pdf") {
+                if (mimeType == wantedMime) {
                     val docId = it.getString(it.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID))
                     val fileUri = DocumentsContract.buildDocumentUriUsingTree(folderUri, docId)
-                    pdfs.add(fileUri)
+                    docs.add(fileUri)
                 }
             }
         }
-        pdfFiles = pdfs.sortedBy { getFileName(it) } // Sort files alphabetically
-        Log.d(tag, "Found ${pdfFiles.size} PDF files in the folder")
+        pdfFiles = docs.sortedBy { getFileName(it) } // Sort files alphabetically
+        Log.d(tag, "Found ${pdfFiles.size} .$fileExt files in the folder")
     }
 
     private fun openPdf(uri: Uri) {
-        val pdfName = getFileName(uri)
-        if (pdfName != null) {
+        val name = getFileName(uri)
+        if (name == null) {
+            Toast.makeText(this, "Could not get file name", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (name.endsWith(".pdf", ignoreCase = true)) {
+            isImageDoc = false
             loadPDF(uri)
             renderPage(0)
         } else {
-            Toast.makeText(this, "Could not get PDF name", Toast.LENGTH_SHORT).show()
+            isImageDoc = true
+            currentPage?.close()
+            currentPage = null
+            pdfRenderer?.close()
+            pdfRenderer = null
+            displayImage(uri, name)
+        }
+    }
+
+    private fun displayImage(uri: Uri, name: String) {
+        try {
+            var bitmap = contentResolver.openInputStream(uri)?.use {
+                android.graphics.BitmapFactory.decodeStream(it)
+            } ?: return
+            if (cropMargins) {
+                bitmap = cropPrintedBorder(bitmap)
+            }
+            binding.pdfImageView.setImageBitmap(bitmap)
+            binding.pdfImageView.isVisible = true
+            binding.receivedPageText.isVisible = false
+            binding.bigNumberText.isVisible = false
+            binding.readingPageInfo.text = getString(R.string.page_info, name, 1, 1)
+            if (isServer) {
+                bluetoothController.sendPdfNameViaAdvertisement(name, 0)
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error loading image", e)
+            Toast.makeText(this, "Error loading image: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -499,7 +601,7 @@ class MainActivity : AppCompatActivity() {
         midiController.start()
         binding.statusText.text = getString(R.string.status_server_started)
         
-        if (pdfRenderer != null) {
+        if (pdfRenderer != null || isImageDoc) {
             binding.setupControls.isVisible = false
             showReadingControls()
             hideSystemUI()
@@ -509,9 +611,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startBLEClient() {
+        // Without a folder the device still works as a section/sheet
+        // number display
         if (pdfFiles.isEmpty()) {
-            Toast.makeText(this, "Please select a PDF folder on this device first", Toast.LENGTH_LONG).show()
-            return
+            Toast.makeText(this, "No folder selected - acting as number display", Toast.LENGTH_LONG).show()
         }
         Log.d(tag, "Starting BLE Client")
         isServer = false
@@ -570,7 +673,8 @@ class MainActivity : AppCompatActivity() {
                 binding.pdfImageView.setImageBitmap(bitmap)
                 binding.pdfImageView.isVisible = true
                 binding.receivedPageText.isVisible = false
-                
+                binding.bigNumberText.isVisible = false
+
                 val fileName = currentPdfIndex.takeIf { it >= 0 }?.let { getFileName(pdfFiles[it]) } ?: "Unknown"
                 binding.readingPageInfo.text = getString(R.string.page_info, fileName, pageIndex + 1, renderer.pageCount)
                 

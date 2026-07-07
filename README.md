@@ -36,6 +36,10 @@ This project enables synchronized PDF viewing between Android devices first usin
 - **Music-Stand Friendly**: tap zones for page turns, Bluetooth pedal support
   (volume/arrow keys), auto-hiding controls, automatic margin cropping,
   screen stays on
+- **Number Display Mode**: devices without the sheet files show the received
+  section/sheet number fullscreen (e.g. "3/15"), readable from a distance
+- **JPG Support**: display images instead of PDFs (same naming scheme,
+  selectable file type in settings), selected folder is remembered
 - **Easy Setup**: Simple one-tap server/client switching
 
 ## 🛠️ Development

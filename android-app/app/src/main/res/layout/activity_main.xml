@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000"
@@ -31,6 +32,24 @@
                 android:text="Client Mode: Waiting for page updates..."
                 android:textSize="18sp"
                 android:background="#f0f0f0"
+                android:visibility="gone" />
+
+            <!-- Fullscreen section/sheet number display when the PDF is not
+                 available - auto-sized to fill the screen, readable from afar -->
+            <TextView
+                android:id="@+id/bigNumberText"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:maxLines="1"
+                app:autoSizeTextType="uniform"
+                app:autoSizeMinTextSize="40sp"
+                app:autoSizeMaxTextSize="1000sp"
+                app:autoSizeStepGranularity="10sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:background="#000000"
+                android:padding="8dp"
                 android:visibility="gone" />
 
         </FrameLayout>
@@ -102,7 +121,23 @@
                 android:text="Auto-hide navigation"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
-                android:checked="true" />
+                android:checked="true"
+                android:layout_marginEnd="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:text="Type:"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:layout_marginEnd="4dp" />
+
+            <Spinner
+                android:id="@+id/fileTypeSpinner"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical" />
 
         </LinearLayout>
 
