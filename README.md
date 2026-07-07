@@ -26,6 +26,10 @@ This project enables synchronized PDF viewing between Android devices first usin
 |---|---|---|
 | ![Setup](docs/screenshots/setup.png) | ![Reading fullscreen](docs/screenshots/reading-fullscreen.png) | ![Reading controls](docs/screenshots/reading-controls.png) |
 
+| Client following the server | Number display (no files needed) |
+|---|---|
+| ![Client sync](docs/screenshots/client-sync.png) | ![Number display](docs/screenshots/number-display.png) |
+
 ## 📱 Features
 
 - **Real-time PDF Sync**: Page changes broadcast via BLE
