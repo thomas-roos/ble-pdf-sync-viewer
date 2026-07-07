@@ -44,6 +44,11 @@ This project enables synchronized PDF viewing between Android devices first usin
   section/sheet number fullscreen (e.g. "3/15"), readable from a distance
 - **JPG Support**: display images instead of PDFs (same naming scheme,
   selectable file type in settings), selected folder is remembered
+- **Group Code**: an optional shared code (settings) isolates your group -
+  clients only accept broadcasts carrying the matching tag, so strangers or a
+  second band in the same venue cannot confuse them. The RTP MIDI session name
+  gets the code as suffix (e.g. "pdf-sync-viewer-bandA"). Note: this prevents
+  accidental interference, it is not cryptographic authentication.
 - **Easy Setup**: Simple one-tap server/client switching
 
 ## 🛠️ Development

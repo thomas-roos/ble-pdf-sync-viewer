@@ -31,6 +31,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import androidx.core.widget.doAfterTextChanged
 import com.github.blebrowserbridge.databinding.ActivityMainBinding
 import java.io.IOException
 import kotlin.math.abs
@@ -57,6 +58,7 @@ class MainActivity : AppCompatActivity() {
         private const val PREF_AUTO_HIDE_NAV = "auto_hide_nav"
         private const val PREF_FILE_EXT = "file_ext"
         private const val PREF_FOLDER_URI = "folder_uri"
+        private const val PREF_GROUP_CODE = "group_code"
         private const val AUTO_HIDE_DELAY_MS = 4000L
         private val FILE_EXTENSIONS = listOf("pdf", "jpg")
     }
@@ -66,6 +68,9 @@ class MainActivity : AppCompatActivity() {
 
     private val fileExt: String
         get() = getPreferences(MODE_PRIVATE).getString(PREF_FILE_EXT, "pdf") ?: "pdf"
+
+    private val groupCode: String
+        get() = getPreferences(MODE_PRIVATE).getString(PREF_GROUP_CODE, "") ?: ""
 
     // Auto-hide the reading controls after a few seconds of inactivity
     private val hideControlsHandler = Handler(Looper.getMainLooper())
@@ -355,6 +360,11 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
+        binding.groupCodeEdit.setText(groupCode)
+        binding.groupCodeEdit.doAfterTextChanged { text ->
+            getPreferences(MODE_PRIVATE).edit().putString(PREF_GROUP_CODE, text.toString().trim()).apply()
+        }
+
         applyDisplayMode()
 
         // Restore the last selected folder if the permission is still held
@@ -597,8 +607,9 @@ class MainActivity : AppCompatActivity() {
     private fun startBLEServer() {
         Log.d(tag, "Starting BLE Server")
         isServer = true
+        bluetoothController.setGroupCode(groupCode)
         bluetoothController.startServer()
-        midiController.start()
+        midiController.start(groupCode)
         binding.statusText.text = getString(R.string.status_server_started)
         
         if (pdfRenderer != null || isImageDoc) {
@@ -618,8 +629,9 @@ class MainActivity : AppCompatActivity() {
         }
         Log.d(tag, "Starting BLE Client")
         isServer = false
+        bluetoothController.setGroupCode(groupCode)
         bluetoothController.startClient()
-        midiController.start()
+        midiController.start(groupCode)
         binding.statusText.text = getString(R.string.status_client_started)
         binding.pdfImageView.isVisible = false
         binding.receivedPageText.isVisible = true

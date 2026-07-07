@@ -22,7 +22,7 @@ class MidiController(private val context: Context) {
     private var bankMsb = 0
     private var bankLsb = 0
 
-    fun start() {
+    fun start(groupCode: String = "") {
         Log.i(TAG, "Starting MIDI Controller")
         
         val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -36,7 +36,9 @@ class MidiController(private val context: Context) {
 
         try {
             midiSession = MIDISession.getInstance()
-            midiSession?.setBonjourName("pdf-sync-viewer")
+            val sessionName = if (groupCode.isEmpty()) "pdf-sync-viewer"
+                              else "pdf-sync-viewer-$groupCode"
+            midiSession?.setBonjourName(sessionName)
             midiSession?.start(context)
             Log.d(TAG, "MIDI Session started")
         } catch (e: Exception) {

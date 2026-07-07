@@ -121,8 +121,15 @@
                 android:text="Auto-hide navigation"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
-                android:checked="true"
-                android:layout_marginEnd="16dp" />
+                android:checked="true" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -137,7 +144,30 @@
                 android:id="@+id/fileTypeSpinner"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical" />
+                android:layout_gravity="center_vertical"
+                android:layout_marginEnd="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:text="Group:"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:layout_marginEnd="4dp" />
+
+            <EditText
+                android:id="@+id/groupCodeEdit"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:hint="shared group code"
+                android:textColorHint="#888888"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:inputType="text"
+                android:maxLines="1"
+                android:imeOptions="actionDone" />
 
         </LinearLayout>
 
