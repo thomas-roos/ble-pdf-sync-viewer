@@ -110,27 +110,25 @@ jobs:
         files: |
           ./apk/*.apk
         body: |
-          ## 🚀 BLE Browser-Android Bridge Release
-          
+          ## 🚀 PDF Sync Viewer Release
+
           ### 📱 Installation
           1. Download the APK file below
           2. Enable "Install from unknown sources" on your Android device
           3. Install the APK
           4. Grant Bluetooth and Location permissions
-          
-          ### 🌐 Web Client
-          Visit the test page: [https://${{ github.repository_owner }}.github.io/ble-browser-android-bridge](https://${{ github.repository_owner }}.github.io/ble-browser-android-bridge)
-          
+
           ### 📋 Usage
-          1. Open the Android app and tap "Start BLE Server"
-          2. Open the web page in Chrome with experimental features enabled
-          3. Click "Connect to Android" and select your device
-          4. Start messaging!
-          
+          1. Put the same PDF files on all devices and select the folder in the app
+          2. Server device: tap "Server" - page turns are broadcast via BLE
+          3. Client devices: tap "Client" - pages follow the server automatically
+          4. Optional: control the server via RTP MIDI (session "pdf-sync-viewer",
+             e.g. from SongBook - bank/program select the PDF named bank_program.pdf)
+
           ### 🔧 Requirements
           - Android 5.0+ (API 21+)
-          - Chrome browser with Web Bluetooth enabled
-          - Bluetooth LE support on both devices
+          - Bluetooth LE support
+          - Same Wi-Fi network for RTP MIDI control
         draft: false
         prerelease: false
         token: ${{ secrets.GITHUB_TOKEN }}
