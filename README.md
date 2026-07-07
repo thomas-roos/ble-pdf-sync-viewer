@@ -20,6 +20,12 @@ This project enables synchronized PDF viewing between Android devices first usin
    - PDF page changes will be received automatically
    - Load the same PDF file to see synchronized navigation
 
+## 📸 Screenshots
+
+| Setup | Reading (fullscreen crop) | Reading controls |
+|---|---|---|
+| ![Setup](docs/screenshots/setup.png) | ![Reading fullscreen](docs/screenshots/reading-fullscreen.png) | ![Reading controls](docs/screenshots/reading-controls.png) |
+
 ## 📱 Features
 
 - **Real-time PDF Sync**: Page changes broadcast via BLE
@@ -27,6 +33,9 @@ This project enables synchronized PDF viewing between Android devices first usin
 - **Dual Mode**: Server (broadcaster) and Client (receiver) modes
 - **No Internet Required**: Direct device-to-device communication
 - **PDF Viewer**: Built-in PDF viewing with navigation controls
+- **Music-Stand Friendly**: tap zones for page turns, Bluetooth pedal support
+  (volume/arrow keys), auto-hiding controls, automatic margin cropping,
+  screen stays on
 - **Easy Setup**: Simple one-tap server/client switching
 
 ## 🛠️ Development
