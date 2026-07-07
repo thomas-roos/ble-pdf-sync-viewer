@@ -68,7 +68,11 @@ This project includes automated workflows:
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) for details.
+GPL-3.0 - see [LICENSE](LICENSE) for details.
+
+The RTP MIDI support is based on a modified copy of
+[DPMIDI](https://github.com/DisappointedPig/DPMIDI) (GPL-3.0), see
+[android-app/midi/NOTICE.md](android-app/midi/NOTICE.md).
 
 ## 🐛 Troubleshooting
 
