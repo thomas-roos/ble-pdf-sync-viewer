@@ -5,23 +5,30 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.KeyEvent
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import com.github.blebrowserbridge.databinding.ActivityMainBinding
 import java.io.IOException
 import kotlin.math.abs
@@ -42,6 +49,53 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gestureDetector: GestureDetector
 
     private val tag = "BLE_PDF_SYNC"
+
+    companion object {
+        private const val PREF_CROP_MARGINS = "crop_margins"
+        private const val PREF_AUTO_HIDE_NAV = "auto_hide_nav"
+        private const val AUTO_HIDE_DELAY_MS = 4000L
+    }
+
+    // Auto-hide the reading controls after a few seconds of inactivity
+    private val hideControlsHandler = Handler(Looper.getMainLooper())
+    private val hideControlsRunnable = Runnable {
+        if (!binding.setupControls.isVisible && binding.readingControls.isVisible) {
+            binding.readingControls.isVisible = false
+            hideSystemUI()
+        }
+    }
+
+    private fun showReadingControls() {
+        binding.readingControls.isVisible = true
+        hideControlsHandler.removeCallbacks(hideControlsRunnable)
+        if (getPreferences(MODE_PRIVATE).getBoolean(PREF_AUTO_HIDE_NAV, true)) {
+            hideControlsHandler.postDelayed(hideControlsRunnable, AUTO_HIDE_DELAY_MS)
+        }
+    }
+
+    private fun showSetupControls() {
+        hideControlsHandler.removeCallbacks(hideControlsRunnable)
+        binding.readingControls.isVisible = false
+        binding.setupControls.isVisible = true
+        supportActionBar?.show()
+        showSystemUI()
+    }
+
+    private val cropMargins: Boolean
+        get() = getPreferences(MODE_PRIVATE).getBoolean(PREF_CROP_MARGINS, true)
+
+    // Crop mode fits the whole page into the viewport (no scrolling),
+    // otherwise the page is shown at full width and scrolls vertically
+    private fun applyDisplayMode() {
+        val fitViewport = cropMargins
+        val height = if (fitViewport) ViewGroup.LayoutParams.MATCH_PARENT
+                     else ViewGroup.LayoutParams.WRAP_CONTENT
+        // adjustViewBounds would grow the view to the bitmap's aspect ratio
+        // and defeat the fit-to-viewport scaling
+        binding.pdfImageView.adjustViewBounds = !fitViewport
+        binding.pdfContainer.updateLayoutParams { this.height = height }
+        binding.pdfImageView.updateLayoutParams { this.height = height }
+    }
 
     private val requestPermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -150,6 +204,10 @@ class MainActivity : AppCompatActivity() {
             private val swipeThreshold = 100
             private val swipeVelocityThreshold = 100
 
+            // Must claim the DOWN event, otherwise the non-clickable views
+            // drop the gesture and neither taps nor flings are detected
+            override fun onDown(e: MotionEvent): Boolean = true
+
             override fun onFling(
                 e1: MotionEvent?,
                 e2: MotionEvent,
@@ -177,7 +235,18 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                toggleFullScreen()
+                // Reading mode: tap zones like a music reader - left third is
+                // previous, right third is next, center toggles the controls
+                if (!binding.setupControls.isVisible && pdfRenderer != null) {
+                    val width = binding.root.width
+                    when {
+                        e.x < width / 3f -> navigatePrevPage()
+                        e.x > width * 2 / 3f -> navigateNextPage()
+                        else -> toggleFullScreen()
+                    }
+                } else {
+                    toggleFullScreen()
+                }
                 return true
             }
         })
@@ -220,10 +289,65 @@ class MainActivity : AppCompatActivity() {
             showDebugLog()
         }
 
-        binding.pdfMenuButton.setOnClickListener { showPdfSelectionMenu() }
+        binding.pdfMenuButton.setOnClickListener {
+            showReadingControls() // reset the idle timer
+            showPdfSelectionMenu()
+        }
 
-        binding.prevPageButton.setOnClickListener { navigatePrevPage() }
-        binding.nextPageButton.setOnClickListener { navigateNextPage() }
+        binding.prevPageButton.setOnClickListener {
+            showReadingControls()
+            navigatePrevPage()
+        }
+        binding.nextPageButton.setOnClickListener {
+            showReadingControls()
+            navigateNextPage()
+        }
+
+        binding.exitReadingButton.setOnClickListener { showSetupControls() }
+
+        binding.cropMarginsCheckbox.isChecked = cropMargins
+        binding.cropMarginsCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            getPreferences(MODE_PRIVATE).edit().putBoolean(PREF_CROP_MARGINS, isChecked).apply()
+            applyDisplayMode()
+            renderPage(currentPageIndex)
+        }
+        binding.autoHideNavCheckbox.isChecked =
+            getPreferences(MODE_PRIVATE).getBoolean(PREF_AUTO_HIDE_NAV, true)
+        binding.autoHideNavCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            getPreferences(MODE_PRIVATE).edit().putBoolean(PREF_AUTO_HIDE_NAV, isChecked).apply()
+        }
+        applyDisplayMode()
+
+        onBackPressedDispatcher.addCallback(this) {
+            if (!binding.setupControls.isVisible) {
+                showSetupControls()
+            } else {
+                finish()
+            }
+        }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // Page-turn pedals typically emulate volume, arrow or page keys
+        if (pdfRenderer != null && !binding.setupControls.isVisible) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_DOWN,
+                KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_PAGE_DOWN -> {
+                    navigateNextPage()
+                    return true
+                }
+                KeyEvent.KEYCODE_VOLUME_UP,
+                KeyEvent.KEYCODE_DPAD_LEFT,
+                KeyEvent.KEYCODE_DPAD_UP,
+                KeyEvent.KEYCODE_PAGE_UP -> {
+                    navigatePrevPage()
+                    return true
+                }
+            }
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     private fun navigatePrevPage() {
@@ -272,9 +396,10 @@ class MainActivity : AppCompatActivity() {
         
         AlertDialog.Builder(this)
             .setTitle("Select PDF")
-            .setItems(fileNames) { _, which ->
+            .setSingleChoiceItems(fileNames, currentPdfIndex) { dialog, which ->
                 currentPdfIndex = which
                 openPdf(pdfFiles[which])
+                dialog.dismiss()
             }
             .show()
     }
@@ -283,23 +408,24 @@ class MainActivity : AppCompatActivity() {
         if (binding.setupControls.isVisible) {
             if (pdfFiles.isNotEmpty()) {
                 binding.setupControls.isVisible = false
-                binding.readingControls.isVisible = true
+                showReadingControls()
                 hideSystemUI()
             }
             return
         }
 
-        val isOverlayVisible = binding.readingControls.isVisible
-        if (isOverlayVisible) {
+        if (binding.readingControls.isVisible) {
+            hideControlsHandler.removeCallbacks(hideControlsRunnable)
             binding.readingControls.isVisible = false
             hideSystemUI()
         } else {
-            binding.readingControls.isVisible = true
+            showReadingControls()
             showSystemUI()
         }
     }
 
     private fun hideSystemUI() {
+        supportActionBar?.hide()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(false)
             val controller = window.insetsController
@@ -375,10 +501,10 @@ class MainActivity : AppCompatActivity() {
         
         if (pdfRenderer != null) {
             binding.setupControls.isVisible = false
-            binding.readingControls.isVisible = true
+            showReadingControls()
             hideSystemUI()
         }
-        
+
         Toast.makeText(this, "BLE Server Started", Toast.LENGTH_SHORT).show()
     }
 
@@ -397,7 +523,7 @@ class MainActivity : AppCompatActivity() {
         binding.receivedPageText.text = getString(R.string.client_waiting)
         
         binding.setupControls.isVisible = false
-        binding.readingControls.isVisible = true
+        showReadingControls()
         hideSystemUI()
 
         Toast.makeText(this, "BLE Client Started", Toast.LENGTH_SHORT).show()
@@ -429,9 +555,16 @@ class MainActivity : AppCompatActivity() {
             currentPage = page
             currentPageIndex = pageIndex
 
-            val bitmap = createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
+            // Render at up to 2x the view width for a crisp image when zoomed
+            val viewWidth = binding.root.width.takeIf { it > 0 } ?: 1080
+            val scale = (2f * viewWidth / page.width).coerceIn(1f, 4096f / maxOf(page.width, page.height))
+            var bitmap = createBitmap((page.width * scale).toInt(), (page.height * scale).toInt(), Bitmap.Config.ARGB_8888)
             bitmap.eraseColor(Color.WHITE)
-            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            val transform = Matrix().apply { setScale(scale, scale) }
+            page.render(bitmap, null, transform, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            if (cropMargins) {
+                bitmap = cropPrintedBorder(bitmap)
+            }
 
             runOnUiThread {
                 binding.pdfImageView.setImageBitmap(bitmap)
@@ -448,6 +581,41 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(tag, "Error rendering page", e)
         }
+    }
+
+    // Find the bounding box of non-white content and cut away the empty
+    // page margins so the printed area can use the whole screen
+    private fun cropPrintedBorder(src: Bitmap): Bitmap {
+        val step = maxOf(1, src.width / 300)
+        val row = IntArray(src.width)
+        var minX = src.width; var minY = src.height; var maxX = -1; var maxY = -1
+
+        for (y in 0 until src.height step step) {
+            src.getPixels(row, 0, src.width, 0, y, src.width, 1)
+            for (x in 0 until src.width step step) {
+                val p = row[x]
+                val isContent = (p ushr 24) > 0x80 &&
+                        ((p shr 16 and 0xFF) < 235 || (p shr 8 and 0xFF) < 235 || (p and 0xFF) < 235)
+                if (isContent) {
+                    if (x < minX) minX = x
+                    if (x > maxX) maxX = x
+                    if (y < minY) minY = y
+                    if (y > maxY) maxY = y
+                }
+            }
+        }
+        if (maxX < 0) return src // blank page
+
+        val pad = maxOf(step, src.width / 100)
+        minX = maxOf(0, minX - pad)
+        minY = maxOf(0, minY - pad)
+        maxX = minOf(src.width - 1, maxX + pad)
+        maxY = minOf(src.height - 1, maxY + pad)
+
+        val width = maxX - minX + 1
+        val height = maxY - minY + 1
+        if (width < src.width / 10 || height < src.height / 10) return src
+        return Bitmap.createBitmap(src, minX, minY, width, height)
     }
 
     private fun getFileName(uri: Uri): String? {
@@ -512,6 +680,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        hideControlsHandler.removeCallbacks(hideControlsRunnable)
         currentPage?.close()
         pdfRenderer?.close()
         bluetoothController.stop()
