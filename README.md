@@ -5,7 +5,10 @@ This project enables synchronized PDF/JPG sheet viewing between Android devices 
 ## 🚀 Quick Start
 
 ### Installation
-1. Download the latest APK from [Releases](../../releases)
+1. Download the latest APK from [Releases](../../releases) - or grab the
+   newest development build from the
+   [nightly pre-release](../../releases/tag/nightly) (updated on every
+   push to main, no GitHub login needed)
 2. Install on your Android devices
 3. Grant Bluetooth and storage permissions when prompted
 
