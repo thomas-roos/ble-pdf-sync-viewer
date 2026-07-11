@@ -47,7 +47,7 @@ jobs:
         ls -la $ANDROID_HOME/
         
     - name: Cache Gradle packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.gradle/caches
@@ -119,11 +119,11 @@ jobs:
           4. Grant Bluetooth and Location permissions
 
           ### 📋 Usage
-          1. Put the same PDF files on all devices and select the folder in the app
-          2. Server device: tap "Server" - page turns are broadcast via BLE
-          3. Client devices: tap "Client" - pages follow the server automatically
+          1. Put the same PDF/JPG files on all devices and select the folder in the app
+          2. Server device: tap "Server" - file and page changes are broadcast via BLE
+          3. Client devices: tap "Client" - they follow the server automatically
           4. Optional: control the server via RTP MIDI (session "pdf-sync-viewer",
-             e.g. from SongBook - bank/program select the PDF named bank_program.pdf)
+             bank/program select the file named bank_program.pdf)
 
           ### 🔧 Requirements
           - Android 5.0+ (API 21+)
