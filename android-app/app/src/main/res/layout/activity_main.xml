@@ -241,15 +241,15 @@
 
         <ImageButton
             android:id="@+id/pdfMenuButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
             android:layout_alignParentTop="true"
             android:layout_centerHorizontal="true"
             android:layout_marginTop="16dp"
             android:background="@android:drawable/btn_default_small"
-            android:src="@android:drawable/ic_menu_sort_alphabetically"
-            android:contentDescription="PDF List"
-            android:alpha="0.4"
+            android:src="@android:drawable/ic_menu_agenda"
+            android:contentDescription="File List"
+            android:alpha="0.9"
             android:tint="#FFFFFF" />
 
         <TextView

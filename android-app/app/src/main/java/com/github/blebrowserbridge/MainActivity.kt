@@ -262,13 +262,17 @@ class MainActivity : AppCompatActivity() {
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 // Reading mode: tap zones like a music reader - left third is
-                // previous, right third is next, center toggles the controls
+                // previous, right third is next, center opens the file list
+                // (and brings the controls back so exit stays reachable)
                 if (!binding.setupControls.isVisible && (pdfRenderer != null || isImageDoc)) {
                     val width = binding.root.width
                     when {
                         e.x < width / 3f -> navigatePrevPage()
                         e.x > width * 2 / 3f -> navigateNextPage()
-                        else -> toggleFullScreen()
+                        else -> {
+                            showReadingControls()
+                            showPdfSelectionMenu()
+                        }
                     }
                 } else {
                     toggleFullScreen()
@@ -466,7 +470,7 @@ class MainActivity : AppCompatActivity() {
         val fileNames = pdfFiles.map { getFileName(it) ?: "Unknown" }.toTypedArray()
         
         AlertDialog.Builder(this)
-            .setTitle("Select PDF")
+            .setTitle("Select file")
             .setSingleChoiceItems(fileNames, currentPdfIndex) { dialog, which ->
                 currentPdfIndex = which
                 openPdf(pdfFiles[which])
