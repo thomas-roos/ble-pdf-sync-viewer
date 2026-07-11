@@ -60,7 +60,10 @@ class MainActivity : AppCompatActivity() {
         private const val PREF_FOLDER_URI = "folder_uri"
         private const val PREF_GROUP_CODE = "group_code"
         private const val AUTO_HIDE_DELAY_MS = 4000L
-        private val FILE_EXTENSIONS = listOf("pdf", "jpg")
+        // "numbers" is a display mode, not a file type: no documents are
+        // loaded and only the received section/sheet number is shown
+        private const val TYPE_NUMBERS = "numbers"
+        private val FILE_EXTENSIONS = listOf("pdf", "jpg", TYPE_NUMBERS)
     }
 
     private var folderUri: Uri? = null
@@ -532,6 +535,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun reloadFolder() {
+        if (fileExt == TYPE_NUMBERS) {
+            clearDocument()
+            return
+        }
         val uri = folderUri ?: return
         listFilesInFolder(uri)
         if (pdfFiles.isNotEmpty()) {
@@ -542,7 +549,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun clearDocument() {
+        currentPage?.close()
+        currentPage = null
+        pdfRenderer?.close()
+        pdfRenderer = null
+        isImageDoc = false
+        pdfFiles = emptyList()
+        currentPdfIndex = -1
+        binding.pdfImageView.setImageBitmap(null)
+        binding.pdfImageView.isVisible = false
+    }
+
     private fun listFilesInFolder(folderUri: Uri) {
+        if (fileExt == TYPE_NUMBERS) {
+            pdfFiles = emptyList()
+            return
+        }
         val wantedMime = if (fileExt == "jpg") "image/jpeg" else "application/pdf"
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folderUri, DocumentsContract.getTreeDocumentId(folderUri))
         val cursor = contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)
@@ -624,7 +647,7 @@ class MainActivity : AppCompatActivity() {
     private fun startBLEClient() {
         // Without a folder the device still works as a section/sheet
         // number display
-        if (pdfFiles.isEmpty()) {
+        if (pdfFiles.isEmpty() && fileExt != TYPE_NUMBERS) {
             Toast.makeText(this, "No folder selected - acting as number display", Toast.LENGTH_LONG).show()
         }
         Log.d(tag, "Starting BLE Client")
