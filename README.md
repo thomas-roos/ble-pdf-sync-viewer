@@ -1,6 +1,6 @@
 # PDF Sync Viewer
 
-This project enables synchronized PDF viewing between Android devices first using BLE communication. But also thinking of RTPMIDI or other options.
+This project enables synchronized PDF/JPG sheet viewing between Android devices using BLE broadcasts, with optional RTP MIDI (AppleMIDI) control of the server.
 
 ## 🚀 Quick Start
 
@@ -10,15 +10,27 @@ This project enables synchronized PDF viewing between Android devices first usin
 3. Grant Bluetooth and storage permissions when prompted
 
 ### Usage
+Copy the PDF/JPG files onto every device **before** starting the app -
+syncing the folder itself is out of scope, use a tool like Dropbox,
+Syncthing or a USB cable for that.
+
+Files are matched by name, so every musician can have their own
+instrument's version of the sheets: keep a common root with one subfolder
+per instrument (same file names in each), and on each tablet select the
+subfolder for that musician's instrument.
+
 1. **Server Device (Presenter)**:
-   - Tap "Select PDF" to choose a PDF file
-   - Tap "Start Server" to begin broadcasting
-   - Navigate through pages - changes will be broadcast to clients
+   - Tap "Select Folder" to choose the folder with your PDF/JPG files
+   - Tap "Server" to begin broadcasting
+   - Navigate through pages and files - changes are broadcast to clients.
+     Tap the center of the page (or the list button) to pick a file from
+     the folder, tap the left/right thirds to turn pages
 
 2. **Client Device (Viewer)**:
-   - Tap "Start Client" to scan for servers
-   - PDF page changes will be received automatically
-   - Load the same PDF file to see synchronized navigation
+   - Select a folder containing the same files (or choose the "Numbers"
+     type to act as a pure number display)
+   - Tap "Client" to listen for broadcasts - file and page changes are
+     followed automatically
 
 ## 📸 Screenshots
 
@@ -32,16 +44,23 @@ This project enables synchronized PDF viewing between Android devices first usin
 
 ## 📱 Features
 
-- **Real-time PDF Sync**: Page changes broadcast via BLE
+- **Real-time File Sync**: which file (and page) is currently open is
+  broadcast via BLE - clients follow by opening their local copy. Only
+  this selection is synchronized, the files themselves are never
+  transferred: distributing the folder to all devices is out of scope of
+  the app. Use a sync tool such as Dropbox, Syncthing or a USB cable, and
+  make sure the files exist on each device before the app is started
 - **RTP MIDI Control**: Control the Server's page navigation using network MIDI (AppleMIDI/RTP MIDI)
 - **Dual Mode**: Server (broadcaster) and Client (receiver) modes
 - **No Internet Required**: Direct device-to-device communication
 - **PDF Viewer**: Built-in PDF viewing with navigation controls
-- **Music-Stand Friendly**: tap zones for page turns, Bluetooth pedal support
-  (volume/arrow keys), auto-hiding controls, automatic margin cropping,
-  screen stays on
+- **Music-Stand Friendly**: tap zones for page turns (center tap opens the
+  file list), Bluetooth pedal support (volume/arrow keys), auto-hiding
+  controls, automatic margin cropping, screen stays on
 - **Number Display Mode**: devices without the sheet files show the received
-  section/sheet number fullscreen (e.g. "3/15"), readable from a distance
+  section/sheet number fullscreen (e.g. "3/15"), readable from a distance.
+  Selecting the "Numbers" file type makes this explicit - no files are
+  loaded at all
 - **JPG Support**: display images instead of PDFs (same naming scheme,
   selectable file type in settings), selected folder is remembered
 - **Group Code**: an optional shared code (settings) isolates your group -
@@ -61,10 +80,12 @@ cd android-app
 
 ## 🔧 Technical Details
 
-- **Android**: Kotlin, BLE Peripheral/Central modes, GATT Server/Client
-- **PDF Viewer**: Android PDF Viewer library
-- **Communication**: Custom GATT service for page synchronization, RTP MIDI (session name: "pdf-sync-viewer")
-- **MIDI Mapping**: Bank Select + Program Change select the PDF by filename, using the 1-based numbers as displayed in SongBook (bank 14 + program 20 opens `14_20.pdf`). Note On turns to the absolute page within the current PDF (Note 5 = Page 5).
+- **Android**: Kotlin, BLE Peripheral/Central modes (advertiser/scanner)
+- **PDF Viewer**: Android's built-in `PdfRenderer`
+- **Communication**: connectionless - the current file name and page are
+  embedded in the BLE advertisement, clients only scan; plus RTP MIDI
+  (session name: "pdf-sync-viewer")
+- **MIDI Mapping**: Bank Select + Program Change select the PDF by filename, using the 1-based numbers as displayed in common song-list/setlist apps (bank 14 + program 20 opens `14_20.pdf`). Note On turns to the absolute page within the current PDF (Note 5 = Page 5).
 - **Range**: ~10-30 meters (typical BLE range), or local Network for MIDI
 
 ## 📋 Requirements
@@ -99,8 +120,9 @@ The RTP MIDI support is based on a modified copy of
 ## 🐛 Troubleshooting
 
 ### Common Issues
-- **"No PDF loaded"**: Select a PDF file first before starting server/client
-- **"Connection failed"**: Check Bluetooth is enabled on both devices
+- **"No PDF loaded"**: Select a folder first before starting server/client
+- **"Client not following"**: Check Bluetooth is enabled on both devices and
+  that both use the same group code
 - **"Permission denied"**: Grant Bluetooth and storage permissions
 - **"Server not found"**: Ensure server device is broadcasting
 
@@ -112,9 +134,10 @@ The RTP MIDI support is based on a modified copy of
 - Use Android Studio logcat for detailed debugging
 
 ### Testing RTP MIDI
-`test_midi.py` (repo root, no dependencies beyond Python 3) emulates the
-SongBook app: it performs the full AppleMIDI handshake, answers clock sync,
-and sends bank select + program change like SongBook does on song selection.
+`test_midi.py` (repo root, no dependencies beyond Python 3) emulates an
+RTP MIDI controller app: it performs the full AppleMIDI handshake, answers
+clock sync, and sends bank select + program change the way setlist apps do
+on song selection.
 
 ```bash
 # Jump to page 42 on the device at 192.168.1.100 (app must be in server mode)
@@ -129,7 +152,7 @@ If you are on macOS, you can also use **Audio MIDI Setup** -> **MIDI Studio**
 
 ## 📖 How It Works
 
-1. **Server Mode**: Device broadcasts page changes via BLE advertisements and GATT server
-2. **Client Mode**: Device scans for BLE advertisements and connects to receive page updates
-3. **Synchronization**: When server changes pages, all connected clients automatically navigate to the same page
-4. **PDF Loading**: Each device loads its own copy of the PDF file for viewing
+1. **Server Mode**: the device embeds the current file name and page in its BLE advertisement
+2. **Client Mode**: the device scans for these advertisements - no connection or pairing is involved
+3. **Synchronization**: when the server opens another file or page, clients open their local copy of the same file (or show its number in Numbers mode)
+4. **File Loading**: each device renders its own copy of the files - the app never transfers file contents. Distribute the folder to all devices beforehand (Dropbox, Syncthing, USB, ...); the files must exist before the app is started
