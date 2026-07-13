@@ -15,6 +15,12 @@ actually arrives over the air:
   `autostart` intent extra) and must show the broadcast number fullscreen;
   screenshots of the client are saved to `SCREENSHOT_DIR` (or the Mobly log
   dir) and uploaded as a `screenshots` artifact in CI
+- RTP MIDI end-to-end: the host connects to the server app's AppleMIDI
+  session (reusing the `SongBookEmulator` from `test_midi.py`) and sends
+  bank select + program change like SongBook; the app must show the selected
+  song number fullscreen. On emulators the UDP ports are reached via
+  `adb emu redir`, on physical devices via the device's LAN IP (skipped if
+  the device has none)
 
 <img src="../docs/screenshots/test-number-display.png" width="280"
   alt="Client tablet showing 7/3 fullscreen during the UI test">

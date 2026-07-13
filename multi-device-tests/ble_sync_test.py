@@ -16,12 +16,18 @@ Usage:
 """
 
 import os
+import re
+import sys
 import time
 
 from mobly import asserts
 from mobly import base_test
 from mobly import test_runner
 from mobly.controllers import android_device
+
+# Reuse the AppleMIDI client from the manual test script in the repo root
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from test_midi import SongBookEmulator
 
 APP_PACKAGE = 'com.github.blebrowserbridge'
 SNIPPET_PACKAGE = APP_PACKAGE + '.test'
@@ -92,7 +98,7 @@ class BleSyncTest(base_test.BaseTestClass):
             ad.ble.stopBle()
 
     def teardown_class(self):
-        for ad in self.ads:
+        for ad in getattr(self, 'ads', []):
             try:
                 ad.unload_snippet('ble')
             except Exception:
@@ -163,34 +169,80 @@ class BleSyncTest(base_test.BaseTestClass):
         ad.adb.shell(['rm', device_path])
         ad.log.info('Screenshot saved to %s', local_path)
 
+    def _launch_app(self, ad, role):
+        ad.adb.shell([
+            'am', 'start', '-W', '-n', APP_PACKAGE + '/.MainActivity',
+            '--es', 'autostart', role])
+        time.sleep(3)  # activity animation + BLE/MIDI startup
+
+    def _close_app(self, ad):
+        # BACK finishes the activity, which stops its BLE and MIDI so later
+        # tests don't see stray advertisements
+        ad.adb.shell(['input', 'keyevent', 'KEYCODE_BACK'])
+        time.sleep(1)
+
+    def _wait_for_ui_text(self, ad, text, screenshot_name):
+        """Waits until `text` appears in the UI, saving a screenshot."""
+        needle = ('"%s"' % text).encode()
+        deadline = time.time() + SYNC_TIMEOUT_S
+        while time.time() < deadline:
+            ad.adb.shell(['uiautomator', 'dump', '/data/local/tmp/ui.xml'])
+            dump = ad.adb.shell(['cat', '/data/local/tmp/ui.xml'])
+            if needle in dump:
+                self._save_screenshot(ad, screenshot_name)
+                return
+            time.sleep(2)
+        self._save_screenshot(ad, screenshot_name + '_FAILED')
+        asserts.fail('%s UI never showed "%s". server BLE events: %s' %
+                     (ad.serial, text, self.server.ble.getBleEvents()))
+
     def test_ui_number_display_follows_server(self):
         """End-to-end through the real UI: the client app is launched in
         client mode (no files selected, so it acts as a number display) and
         must show the number of the file the server broadcasts."""
-        self.client.adb.shell([
-            'am', 'start', '-W', '-n', APP_PACKAGE + '/.MainActivity',
-            '--es', 'autostart', 'client'])
-        time.sleep(3)  # activity animation + BLE scan start
+        self._launch_app(self.client, 'client')
         self._save_screenshot(self.client, 'client_waiting')
 
         self.server.ble.broadcast('7_3.pdf', 0)
+        try:
+            # 7_3.pdf is not on the device, so the app shows "7/3" fullscreen
+            self._wait_for_ui_text(self.client, '7/3', 'client_number_display')
+        finally:
+            self._close_app(self.client)
 
-        # 7_3.pdf is not on the device, so the app shows "7/3" fullscreen
-        deadline = time.time() + SYNC_TIMEOUT_S
-        while time.time() < deadline:
-            self.client.adb.shell(
-                ['uiautomator', 'dump', '/data/local/tmp/ui.xml'])
-            dump = self.client.adb.shell(['cat', '/data/local/tmp/ui.xml'])
-            if b'"7/3"' in dump:
-                break
-            time.sleep(2)
-        else:
-            self._save_screenshot(self.client, 'client_number_display_FAILED')
-            asserts.fail('Client UI never showed the number display "7/3". '
-                         'server BLE events: %s' %
-                         self.server.ble.getBleEvents())
-        self._save_screenshot(self.client, 'client_number_display')
-        self.client.adb.shell(['input', 'keyevent', 'KEYCODE_HOME'])
+    def _midi_endpoint(self, ad):
+        """Returns (host, control_port) reaching the app's RTP MIDI ports."""
+        if ad.serial.startswith('emulator-'):
+            # Let the emulator NAT forward host ports to the guest's 5004/5005
+            for redir in ('udp:15004:5004', 'udp:15005:5005'):
+                ad.adb.emu(['redir', 'add', redir])
+            return '127.0.0.1', 15004
+        out = ad.adb.shell(['ip', 'route', 'get', '1.1.1.1']).decode()
+        match = re.search(r'src (\S+)', out)
+        if not match:
+            asserts.skip('%s has no IP reachable from the host' % ad.serial)
+        return match.group(1), 5004
+
+    def test_midi_song_select_shows_number(self):
+        """RTP MIDI end-to-end: the host connects to the server app's
+        AppleMIDI session like SongBook would and selects song 14_20; with
+        no files on the device the app must show "14/20" fullscreen."""
+        host, port = self._midi_endpoint(self.server)
+        self._launch_app(self.server, 'server')
+        emu = SongBookEmulator(host, port, 'Mobly MIDI test')
+        try:
+            emu.connect()
+            emu.listen(1.0)  # answer the app's first clock sync round
+            # display value 14_20 -> wire values bank 13, program 19
+            emu.send_song_select(program=19, bank=13)
+            emu.listen(2.0)
+        finally:
+            emu.disconnect()
+        try:
+            self._wait_for_ui_text(self.server, '14/20',
+                                   'server_midi_number_display')
+        finally:
+            self._close_app(self.server)
 
 
 if __name__ == '__main__':
