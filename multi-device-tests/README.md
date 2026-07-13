@@ -11,6 +11,10 @@ actually arrives over the air:
 - long file names are truncated to the 13 bytes that fit the advertisement
 - a client with a different group code ignores the broadcast
 - a client with the matching group code receives it
+- UI end-to-end: the real app is launched in client mode (via the
+  `autostart` intent extra) and must show the broadcast number fullscreen;
+  screenshots of the client are saved to `SCREENSHOT_DIR` (or the Mobly log
+  dir) and uploaded as a `screenshots` artifact in CI
 
 ## How it works
 

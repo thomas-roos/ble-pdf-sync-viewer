@@ -222,6 +222,13 @@ class MainActivity : AppCompatActivity() {
         setupGestures()
         requestPermissions()
 
+        // Start a role directly, for kiosk setups and the multi-device tests:
+        // adb shell am start -n <pkg>/.MainActivity --es autostart client|server
+        when (intent.getStringExtra("autostart")) {
+            "client" -> binding.root.post { startBLEClient() }
+            "server" -> binding.root.post { startBLEServer() }
+        }
+
         Log.d(tag, "App started")
     }
 

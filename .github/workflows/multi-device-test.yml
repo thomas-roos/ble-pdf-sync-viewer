@@ -12,6 +12,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  # avdmanager and the emulator must agree on where AVDs live
+  ANDROID_AVD_HOME: /home/runner/.android/avd
+
 jobs:
   multi-device-test:
     runs-on: ubuntu-latest
@@ -62,21 +66,28 @@ jobs:
 
     - name: Create two AVDs
       run: |
+        mkdir -p "$ANDROID_AVD_HOME"
         for name in server client; do
           echo no | avdmanager create avd -n "$name" -k "system-images;android-34;google_apis;x86_64" -d pixel_5 --force
+          test -f "$ANDROID_AVD_HOME/$name.ini" || { echo "AVD $name missing in $ANDROID_AVD_HOME"; ls -laR "$ANDROID_AVD_HOME" || true; exit 1; }
         done
+        avdmanager list avd
 
     - name: Boot two emulators with shared virtual Bluetooth
       run: |
         EMU="$ANDROID_HOME/emulator/emulator"
         COMMON_ARGS="-no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -feature BluetoothEmulation"
         $EMU -avd server -port 5554 $COMMON_ARGS &
+        SERVER_PID=$!
         $EMU -avd client -port 5556 $COMMON_ARGS &
+        CLIENT_PID=$!
+        # Fail fast if an emulator process dies instead of hanging in adb
         for serial in emulator-5554 emulator-5556; do
-          adb -s $serial wait-for-device
-          timeout 600 bash -c "until [ \"\$(adb -s $serial shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')\" = '1' ]; do sleep 5; done"
+          timeout 120 adb -s $serial wait-for-device || { echo "$serial never appeared"; exit 1; }
+          timeout 600 bash -c "until [ \"\$(adb -s $serial shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')\" = '1' ]; do sleep 5; done" || { echo "$serial never finished booting"; exit 1; }
           echo "$serial booted"
         done
+        kill -0 $SERVER_PID $CLIENT_PID
         adb devices
 
     - name: Enable Bluetooth and location on the emulators
@@ -90,14 +101,36 @@ jobs:
       run: pip3 install -r multi-device-tests/requirements.txt
 
     - name: Run multi-device BLE tests
+      env:
+        SCREENSHOT_DIR: ${{ github.workspace }}/screenshots
       run: |
         chmod +x multi-device-tests/run_tests.sh
         multi-device-tests/run_tests.sh --skip-build
 
+    - name: Upload screenshots
+      id: upload-screenshots
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: screenshots
+        path: screenshots/
+        retention-days: 30
+        if-no-files-found: ignore
+
     - name: Upload Mobly logs
+      id: upload-mobly-logs
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: mobly-logs
         path: /tmp/logs/mobly
         retention-days: 30
+
+    - name: Link artifacts in the job summary
+      if: always()
+      run: |
+        {
+          echo "## Multi-device BLE test artifacts"
+          echo "- [Screenshots (client UI following the server)](${{ steps.upload-screenshots.outputs.artifact-url }})"
+          echo "- [Mobly logs](${{ steps.upload-mobly-logs.outputs.artifact-url }})"
+        } >> "$GITHUB_STEP_SUMMARY"
