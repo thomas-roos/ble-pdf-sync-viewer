@@ -57,7 +57,13 @@ android {
         warningsAsErrors = true
         // "A newer version is available" checks break CI on upstream
         // releases without any code change - versions are bumped deliberately
-        disable += listOf("GradleDependency", "AndroidGradlePluginVersion", "NewerVersionAvailable")
+        disable +=
+            listOf(
+                "GradleDependency",
+                "AndroidGradlePluginVersion",
+                "NewerVersionAvailable",
+                "OldTargetApi",
+            )
     }
 }
 
