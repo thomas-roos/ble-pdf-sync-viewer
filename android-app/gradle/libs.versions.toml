@@ -9,6 +9,7 @@ constraintlayout = "2.1.4"
 junit = "4.13.2"
 androidxTestExtJunit = "1.1.5"
 espressoCore = "3.5.1"
+moblySnippetLib = "1.4.0"
 eventbus = "3.3.1"
 compileSdk = "34"
 minSdk = "21"
@@ -25,6 +26,7 @@ androidx-constraintlayout = { group = "androidx.constraintlayout", name = "const
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+mobly-snippet-lib = { group = "com.google.android.mobly", name = "mobly-snippet-lib", version.ref = "moblySnippetLib" }
 eventbus = { group = "org.greenrobot", name = "eventbus", version.ref = "eventbus" }
 
 [plugins]

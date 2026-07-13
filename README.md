@@ -104,6 +104,10 @@ cd android-app
 This project includes automated workflows:
 - **Android APK Build**: Automatic APK generation on releases
 - **Release Management**: Tagged releases with downloadable APKs
+- **Multi-Device BLE Tests**: on every push, two emulators with virtual
+  Bluetooth run the real server/client sync against each other - see
+  [multi-device-tests/](multi-device-tests/) (the same suite runs on
+  physical devices via `multi-device-tests/run_tests.sh`)
 
 ## 🤝 Contributing
 

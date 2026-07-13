@@ -16,7 +16,9 @@ android {
         versionCode = libs.versions.versionCode.get().toInt()
         versionName = libs.versions.versionName.get()
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Mobly snippet runner: lets the multi-device tests (see
+        // multi-device-tests/ in the repo root) call into the app via RPC
+        testInstrumentationRunner = "com.google.android.mobly.snippet.SnippetRunner"
     }
 
     buildTypes {
@@ -53,4 +55,5 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.mobly.snippet.lib)
 }
