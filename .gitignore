@@ -23,6 +23,9 @@ gradle-app.setting
 *.swo
 *~
 
+# Python
+__pycache__/
+
 # OS
 .DS_Store
 .DS_Store?
