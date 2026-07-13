@@ -171,8 +171,10 @@ class MainActivity : AppCompatActivity() {
 
                     Log.d(tag, "Client received PDF: $pdfName, page: $pageIndex")
                     // Match by the start of the name to handle truncated advertisement data
-                    val uriToOpen = pdfFiles.find { uri -> 
-                        getFileName(uri)?.startsWith(pdfName, ignoreCase = true) == true 
+                    val uriToOpen = pdfFiles.find { uri ->
+                        getFileName(uri)?.let {
+                            SyncProtocol.matchesAdvertisedName(it, pdfName)
+                        } == true
                     }
 
                     if (uriToOpen != null) {
@@ -201,7 +203,7 @@ class MainActivity : AppCompatActivity() {
         midiController.onSongSelectRequested = { bank, program ->
             // Filenames use the numbers as displayed in SongBook (1-based),
             // the wire values are 0-based: bank 13 + program 19 -> 14_20.pdf
-            val target = "${bank + 1}_${program + 1}"
+            val target = SyncProtocol.midiTargetName(bank, program)
             Log.d(tag, "Song select via MIDI: bank=$bank program=$program -> $target.pdf")
             runOnUiThread {
                 val uri = pdfFiles.find { getFileName(it)?.substringBeforeLast('.') == target }
@@ -736,36 +738,12 @@ class MainActivity : AppCompatActivity() {
     // Find the bounding box of non-white content and cut away the empty
     // page margins so the printed area can use the whole screen
     private fun cropPrintedBorder(src: Bitmap): Bitmap {
-        val step = maxOf(1, src.width / 300)
         val row = IntArray(src.width)
-        var minX = src.width; var minY = src.height; var maxX = -1; var maxY = -1
-
-        for (y in 0 until src.height step step) {
+        val bounds = CropMargins.computeContentBounds(src.width, src.height) { y ->
             src.getPixels(row, 0, src.width, 0, y, src.width, 1)
-            for (x in 0 until src.width step step) {
-                val p = row[x]
-                val isContent = (p ushr 24) > 0x80 &&
-                        ((p shr 16 and 0xFF) < 235 || (p shr 8 and 0xFF) < 235 || (p and 0xFF) < 235)
-                if (isContent) {
-                    if (x < minX) minX = x
-                    if (x > maxX) maxX = x
-                    if (y < minY) minY = y
-                    if (y > maxY) maxY = y
-                }
-            }
-        }
-        if (maxX < 0) return src // blank page
-
-        val pad = maxOf(step, src.width / 100)
-        minX = maxOf(0, minX - pad)
-        minY = maxOf(0, minY - pad)
-        maxX = minOf(src.width - 1, maxX + pad)
-        maxY = minOf(src.height - 1, maxY + pad)
-
-        val width = maxX - minX + 1
-        val height = maxY - minY + 1
-        if (width < src.width / 10 || height < src.height / 10) return src
-        return Bitmap.createBitmap(src, minX, minY, width, height)
+            row
+        } ?: return src
+        return Bitmap.createBitmap(src, bounds.x, bounds.y, bounds.width, bounds.height)
     }
 
     private fun getFileName(uri: Uri): String? {

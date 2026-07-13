@@ -36,23 +36,13 @@ class BluetoothController(private val context: Context) {
     companion object {
         private const val TAG = "BluetoothController"
         private const val MANUFACTURER_ID = 0xFFFF
-        private const val MAX_ADVERTISEMENT_BYTES = 20
-        private const val GROUP_TAG_SIZE = 4
     }
 
-    // First bytes of SHA-256 of the shared group code. Advertisements carry
-    // it as a prefix and clients filter on it, so unrelated senders (or a
-    // second group in the same venue) cannot confuse the clients.
-    private var groupTag = deriveGroupTag("")
+    private var groupTag = SyncProtocol.deriveGroupTag("")
 
     fun setGroupCode(code: String) {
-        groupTag = deriveGroupTag(code)
+        groupTag = SyncProtocol.deriveGroupTag(code)
     }
-
-    private fun deriveGroupTag(code: String): ByteArray =
-        java.security.MessageDigest.getInstance("SHA-256")
-            .digest("pdf-sync-viewer:$code".toByteArray(Charsets.UTF_8))
-            .copyOf(GROUP_TAG_SIZE)
 
     var onPdfNameReceived: ((String, Int) -> Unit)? = null
     val bleEvents = mutableListOf<String>()
@@ -103,22 +93,7 @@ class BluetoothController(private val context: Context) {
             .setConnectable(false)
             .build()
 
-        // Payload: [group tag (4)] [counter] [page hi] [page lo] [name...]
-        val p1 = (pageIndex shr 8 and 0xFF).toByte()
-        val p2 = (pageIndex and 0xFF).toByte()
-
-        val headerSize = GROUP_TAG_SIZE + 3
-        var nameBytes = pdfName.toByteArray(Charsets.UTF_8)
-        if (nameBytes.size > MAX_ADVERTISEMENT_BYTES - headerSize) {
-            nameBytes = nameBytes.sliceArray(0 until MAX_ADVERTISEMENT_BYTES - headerSize)
-        }
-
-        val dataBytes = ByteArray(nameBytes.size + headerSize)
-        System.arraycopy(groupTag, 0, dataBytes, 0, GROUP_TAG_SIZE)
-        dataBytes[GROUP_TAG_SIZE] = counter
-        dataBytes[GROUP_TAG_SIZE + 1] = p1
-        dataBytes[GROUP_TAG_SIZE + 2] = p2
-        System.arraycopy(nameBytes, 0, dataBytes, headerSize, nameBytes.size)
+        val dataBytes = SyncProtocol.encode(groupTag, counter, pageIndex, pdfName)
 
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
@@ -146,7 +121,7 @@ class BluetoothController(private val context: Context) {
         // Firmware-level filter: only advertisements whose manufacturer data
         // starts with our group tag reach the callback (the filter compares
         // just the tag-length prefix)
-        val filterMask = ByteArray(GROUP_TAG_SIZE) { 0xFF.toByte() }
+        val filterMask = ByteArray(SyncProtocol.GROUP_TAG_SIZE) { 0xFF.toByte() }
         val scanFilters = listOf(
             ScanFilter.Builder()
                 .setManufacturerData(MANUFACTURER_ID, groupTag.copyOf(), filterMask)
@@ -208,25 +183,17 @@ class BluetoothController(private val context: Context) {
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             result?.scanRecord?.getManufacturerSpecificData(MANUFACTURER_ID)?.let { data ->
-                val headerSize = GROUP_TAG_SIZE + 3
-                if (data.size >= headerSize) {
-                    // Double-check the group tag in case the firmware filter
-                    // was not applied
-                    for (i in 0 until GROUP_TAG_SIZE) {
-                        if (data[i] != groupTag[i]) return
-                    }
-                    val counter = data[GROUP_TAG_SIZE]
-                    val pageIndex = ((data[GROUP_TAG_SIZE + 1].toInt() and 0xFF) shl 8) or (data[GROUP_TAG_SIZE + 2].toInt() and 0xFF)
-                    val pdfName = String(data, headerSize, data.size - headerSize, Charsets.UTF_8).trim { it <= ' ' || it == '\u0000' }
-                    
-                    if (pdfName != lastReceivedPdfName || pageIndex != lastReceivedPageIndex || counter != lastReceivedCounter) {
-                        lastReceivedPdfName = pdfName
-                        lastReceivedPageIndex = pageIndex
-                        lastReceivedCounter = counter
-                        Log.d(TAG, "Received update: $pdfName:$pageIndex (v$counter)")
-                        bleEvents.add("Received update: $pdfName:$pageIndex (v$counter)")
-                        onPdfNameReceived?.invoke(pdfName, pageIndex)
-                    }
+                // decode() re-checks the group tag in case the firmware
+                // filter was not applied
+                val update = SyncProtocol.decode(groupTag, data) ?: return
+                val (pdfName, pageIndex, counter) = update
+                if (pdfName != lastReceivedPdfName || pageIndex != lastReceivedPageIndex || counter != lastReceivedCounter) {
+                    lastReceivedPdfName = pdfName
+                    lastReceivedPageIndex = pageIndex
+                    lastReceivedCounter = counter
+                    Log.d(TAG, "Received update: $pdfName:$pageIndex (v$counter)")
+                    bleEvents.add("Received update: $pdfName:$pageIndex (v$counter)")
+                    onPdfNameReceived?.invoke(pdfName, pageIndex)
                 }
             }
         }

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Pre-commit hook: run the JVM unit tests (fast, no devices needed).
+# Enable once per clone with:  git config core.hooksPath hooks
+set -e
+cd "$(git rev-parse --show-toplevel)/android-app"
+echo "pre-commit: running unit tests..."
+./gradlew :app:testDebugUnitTest -q
+echo "pre-commit: unit tests passed"

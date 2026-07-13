@@ -63,7 +63,12 @@ jobs:
       run: |
         cd android-app
         ./gradlew clean
-        
+
+    - name: Run unit tests
+      run: |
+        cd android-app
+        ./gradlew :app:testDebugUnitTest --stacktrace
+
     - name: Build debug APK
       run: |
         cd android-app

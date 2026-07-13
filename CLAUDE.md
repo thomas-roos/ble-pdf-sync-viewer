@@ -14,7 +14,13 @@ RTP MIDI (AppleMIDI). See README.md for features and usage.
   emulators with virtual Bluetooth) through the app's actual code — see
   `multi-device-tests/README.md` for how it works.
 - **Pure logic** (payload encoding, name matching, margin cropping): add a
-  plain JUnit test under `android-app/app/src/test/`.
+  plain JUnit test under `android-app/app/src/test/`. Keep such logic in
+  Android-free objects (`SyncProtocol`, `CropMargins`) so it stays testable.
+
+**Always run the unit tests before committing**:
+`cd android-app && ./gradlew :app:testDebugUnitTest`. The repo ships a
+pre-commit hook for this — enable it once per clone with
+`git config core.hooksPath hooks`.
 
 If a feature needs app cooperation to be testable, prefer small explicit
 hooks (like the `autostart` intent extra in `MainActivity`) over UI
