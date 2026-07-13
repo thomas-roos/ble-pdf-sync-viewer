@@ -66,6 +66,10 @@ class BleSyncTest(base_test.BaseTestClass):
                 pass  # not grantable on this API level - install -g covers it
         for command in (
             ['settings', 'put', 'secure', 'location_mode', '3'],
+            # The first-run "Viewing full screen" hint is a focused system
+            # window that hides the app from uiautomator dumps
+            ['settings', 'put', 'secure', 'immersive_mode_confirmations',
+             'confirmed'],
             ['svc', 'bluetooth', 'enable'],
             ['cmd', 'bluetooth_manager', 'enable'],
         ):
