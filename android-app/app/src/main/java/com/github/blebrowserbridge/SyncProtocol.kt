@@ -18,11 +18,17 @@ object SyncProtocol {
     // it as a prefix and clients filter on it, so unrelated senders (or a
     // second group in the same venue) cannot confuse the clients.
     fun deriveGroupTag(code: String): ByteArray =
-        MessageDigest.getInstance("SHA-256")
+        MessageDigest
+            .getInstance("SHA-256")
             .digest("pdf-sync-viewer:$code".toByteArray(Charsets.UTF_8))
             .copyOf(GROUP_TAG_SIZE)
 
-    fun encode(groupTag: ByteArray, counter: Byte, pageIndex: Int, name: String): ByteArray {
+    fun encode(
+        groupTag: ByteArray,
+        counter: Byte,
+        pageIndex: Int,
+        name: String,
+    ): ByteArray {
         var nameBytes = name.toByteArray(Charsets.UTF_8)
         if (nameBytes.size > MAX_NAME_BYTES) {
             nameBytes = nameBytes.sliceArray(0 until MAX_NAME_BYTES)
@@ -36,30 +42,44 @@ object SyncProtocol {
         return data
     }
 
-    data class Update(val name: String, val pageIndex: Int, val counter: Byte)
+    data class Update(
+        val name: String,
+        val pageIndex: Int,
+        val counter: Byte,
+    )
 
     /** Returns null if the payload is too short or carries another group's tag. */
-    fun decode(groupTag: ByteArray, data: ByteArray): Update? {
+    fun decode(
+        groupTag: ByteArray,
+        data: ByteArray,
+    ): Update? {
         if (data.size < HEADER_SIZE) return null
         for (i in 0 until GROUP_TAG_SIZE) {
             if (data[i] != groupTag[i]) return null
         }
         val counter = data[GROUP_TAG_SIZE]
-        val pageIndex = ((data[GROUP_TAG_SIZE + 1].toInt() and 0xFF) shl 8) or
+        val pageIndex =
+            ((data[GROUP_TAG_SIZE + 1].toInt() and 0xFF) shl 8) or
                 (data[GROUP_TAG_SIZE + 2].toInt() and 0xFF)
-        val name = String(data, HEADER_SIZE, data.size - HEADER_SIZE, Charsets.UTF_8)
-            .trim { it <= ' ' || it == '\u0000' }
+        val name =
+            String(data, HEADER_SIZE, data.size - HEADER_SIZE, Charsets.UTF_8)
+                .trim { it <= ' ' || it == '\u0000' }
         return Update(name, pageIndex, counter)
     }
 
     /** Advertised names may be truncated: match local files by prefix. */
-    fun matchesAdvertisedName(fileName: String, advertisedName: String): Boolean =
-        fileName.startsWith(advertisedName, ignoreCase = true)
+    fun matchesAdvertisedName(
+        fileName: String,
+        advertisedName: String,
+    ): Boolean = fileName.startsWith(advertisedName, ignoreCase = true)
 
     /**
      * MIDI bank/program (0-based wire values) to the file base name, using
      * the 1-based numbers as displayed in SongBook: bank 13 + program 19
      * selects "14_20".
      */
-    fun midiTargetName(bank: Int, program: Int): String = "${bank + 1}_${program + 1}"
+    fun midiTargetName(
+        bank: Int,
+        program: Int,
+    ): String = "${bank + 1}_${program + 1}"
 }

@@ -12,11 +12,11 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.view.KeyEvent
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.util.Log
 import android.view.GestureDetector
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -33,7 +33,6 @@ import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.widget.doAfterTextChanged
 import com.github.blebrowserbridge.databinding.ActivityMainBinding
-import java.io.IOException
 import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
@@ -60,6 +59,7 @@ class MainActivity : AppCompatActivity() {
         private const val PREF_FOLDER_URI = "folder_uri"
         private const val PREF_GROUP_CODE = "group_code"
         private const val AUTO_HIDE_DELAY_MS = 4000L
+
         // "numbers" is a display mode, not a file type: no documents are
         // loaded and only the received section/sheet number is shown
         private const val TYPE_NUMBERS = "numbers"
@@ -77,12 +77,13 @@ class MainActivity : AppCompatActivity() {
 
     // Auto-hide the reading controls after a few seconds of inactivity
     private val hideControlsHandler = Handler(Looper.getMainLooper())
-    private val hideControlsRunnable = Runnable {
-        if (!binding.setupControls.isVisible && binding.readingControls.isVisible) {
-            binding.readingControls.isVisible = false
-            hideSystemUI()
+    private val hideControlsRunnable =
+        Runnable {
+            if (!binding.setupControls.isVisible && binding.readingControls.isVisible) {
+                binding.readingControls.isVisible = false
+                hideSystemUI()
+            }
         }
-    }
 
     private fun showReadingControls() {
         binding.readingControls.isVisible = true
@@ -116,8 +117,12 @@ class MainActivity : AppCompatActivity() {
     // otherwise the page is shown at full width and scrolls vertically
     private fun applyDisplayMode() {
         val fitViewport = cropMargins
-        val height = if (fitViewport) ViewGroup.LayoutParams.MATCH_PARENT
-                     else ViewGroup.LayoutParams.WRAP_CONTENT
+        val height =
+            if (fitViewport) {
+                ViewGroup.LayoutParams.MATCH_PARENT
+            } else {
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            }
         // adjustViewBounds would grow the view to the bitmap's aspect ratio
         // and defeat the fit-to-viewport scaling
         binding.pdfImageView.adjustViewBounds = !fitViewport
@@ -125,30 +130,32 @@ class MainActivity : AppCompatActivity() {
         binding.pdfImageView.updateLayoutParams { this.height = height }
     }
 
-    private val requestPermissionsLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        permissions.entries.forEach { (permission, isGranted) ->
-            if (!isGranted) {
-                Log.w(tag, "Permission not granted: $permission")
-                Toast.makeText(this, "Permission required: $permission", Toast.LENGTH_SHORT).show()
+    private val requestPermissionsLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) { permissions ->
+            permissions.entries.forEach { (permission, isGranted) ->
+                if (!isGranted) {
+                    Log.w(tag, "Permission not granted: $permission")
+                    Toast.makeText(this, "Permission required: $permission", Toast.LENGTH_SHORT).show()
+                }
             }
         }
-    }
 
-    private val pickPdfLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            result.data?.data?.let { uri ->
-                Log.d(tag, "Folder selected: $uri")
-                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                getPreferences(MODE_PRIVATE).edit().putString(PREF_FOLDER_URI, uri.toString()).apply()
-                folderUri = uri
-                reloadFolder()
+    private val pickPdfLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) { result ->
+            if (result.resultCode == RESULT_OK) {
+                result.data?.data?.let { uri ->
+                    Log.d(tag, "Folder selected: $uri")
+                    contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    getPreferences(MODE_PRIVATE).edit().putString(PREF_FOLDER_URI, uri.toString()).apply()
+                    folderUri = uri
+                    reloadFolder()
+                }
             }
         }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         System.setProperty("java.net.preferIPv4Stack", "true")
@@ -160,7 +167,7 @@ class MainActivity : AppCompatActivity() {
 
         bluetoothController = BluetoothController(this)
         midiController = MidiController(this)
-        
+
         bluetoothController.onPdfNameReceived = { pdfName, pageIndex ->
             runOnUiThread {
                 if (!isServer) {
@@ -171,11 +178,12 @@ class MainActivity : AppCompatActivity() {
 
                     Log.d(tag, "Client received PDF: $pdfName, page: $pageIndex")
                     // Match by the start of the name to handle truncated advertisement data
-                    val uriToOpen = pdfFiles.find { uri ->
-                        getFileName(uri)?.let {
-                            SyncProtocol.matchesAdvertisedName(it, pdfName)
-                        } == true
-                    }
+                    val uriToOpen =
+                        pdfFiles.find { uri ->
+                            getFileName(uri)?.let {
+                                SyncProtocol.matchesAdvertisedName(it, pdfName)
+                            } == true
+                        }
 
                     if (uriToOpen != null) {
                         val newPdfIndex = pdfFiles.indexOf(uriToOpen)
@@ -235,67 +243,72 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupGestures() {
-        gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            private val swipeThreshold = 100
-            private val swipeVelocityThreshold = 100
+        gestureDetector =
+            GestureDetector(
+                this,
+                object : GestureDetector.SimpleOnGestureListener() {
+                    private val swipeThreshold = 100
+                    private val swipeVelocityThreshold = 100
 
-            // Must claim the DOWN event, otherwise the non-clickable views
-            // drop the gesture and neither taps nor flings are detected
-            override fun onDown(e: MotionEvent): Boolean = true
+                    // Must claim the DOWN event, otherwise the non-clickable views
+                    // drop the gesture and neither taps nor flings are detected
+                    override fun onDown(e: MotionEvent): Boolean = true
 
-            override fun onFling(
-                e1: MotionEvent?,
-                e2: MotionEvent,
-                velocityX: Float,
-                velocityY: Float
-            ): Boolean {
-                if (e1 == null) return false
-                val diffY = e2.y - e1.y
-                val diffX = e2.x - e1.x
-                if (abs(diffX) > abs(diffY)) {
-                    if (abs(diffX) > swipeThreshold && abs(velocityX) > swipeVelocityThreshold) {
-                        if (diffX > 0) {
-                            navigatePrevPage()
+                    override fun onFling(
+                        e1: MotionEvent?,
+                        e2: MotionEvent,
+                        velocityX: Float,
+                        velocityY: Float,
+                    ): Boolean {
+                        if (e1 == null) return false
+                        val diffY = e2.y - e1.y
+                        val diffX = e2.x - e1.x
+                        if (abs(diffX) > abs(diffY)) {
+                            if (abs(diffX) > swipeThreshold && abs(velocityX) > swipeVelocityThreshold) {
+                                if (diffX > 0) {
+                                    navigatePrevPage()
+                                } else {
+                                    navigateNextPage()
+                                }
+                                return true
+                            }
+                        } else if (diffY > swipeThreshold && abs(velocityY) > swipeVelocityThreshold) {
+                            // Swipe Down from top
+                            showPdfSelectionMenu()
+                            return true
+                        }
+                        return false
+                    }
+
+                    override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                        // Reading mode: tap zones like a music reader - left third is
+                        // previous, right third is next, center opens the file list
+                        // (and brings the controls back so exit stays reachable)
+                        if (!binding.setupControls.isVisible && (pdfRenderer != null || isImageDoc)) {
+                            val width = binding.root.width
+                            when {
+                                e.x < width / 3f -> navigatePrevPage()
+                                e.x > width * 2 / 3f -> navigateNextPage()
+                                else -> {
+                                    showReadingControls()
+                                    showPdfSelectionMenu()
+                                }
+                            }
                         } else {
-                            navigateNextPage()
+                            toggleFullScreen()
                         }
                         return true
                     }
-                } else if (diffY > swipeThreshold && abs(velocityY) > swipeVelocityThreshold) {
-                    // Swipe Down from top
-                    showPdfSelectionMenu()
-                    return true
-                }
-                return false
-            }
+                },
+            )
 
-            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                // Reading mode: tap zones like a music reader - left third is
-                // previous, right third is next, center opens the file list
-                // (and brings the controls back so exit stays reachable)
-                if (!binding.setupControls.isVisible && (pdfRenderer != null || isImageDoc)) {
-                    val width = binding.root.width
-                    when {
-                        e.x < width / 3f -> navigatePrevPage()
-                        e.x > width * 2 / 3f -> navigateNextPage()
-                        else -> {
-                            showReadingControls()
-                            showPdfSelectionMenu()
-                        }
-                    }
-                } else {
-                    toggleFullScreen()
+        val touchListener =
+            View.OnTouchListener { v, event ->
+                if (event.action == MotionEvent.ACTION_UP) {
+                    v.performClick()
                 }
-                return true
+                gestureDetector.onTouchEvent(event)
             }
-        })
-
-        val touchListener = View.OnTouchListener { v, event ->
-            if (event.action == MotionEvent.ACTION_UP) {
-                v.performClick()
-            }
-            gestureDetector.onTouchEvent(event)
-        }
 
         binding.pdfImageView.setOnTouchListener(touchListener)
         binding.receivedPageText.setOnTouchListener(touchListener)
@@ -356,26 +369,40 @@ class MainActivity : AppCompatActivity() {
             getPreferences(MODE_PRIVATE).edit().putBoolean(PREF_AUTO_HIDE_NAV, isChecked).apply()
         }
 
-        binding.fileTypeSpinner.adapter = object : ArrayAdapter<String>(
-            this, android.R.layout.simple_spinner_dropdown_item,
-            FILE_EXTENSIONS.map { it.uppercase() }) {
-            // The selected item is rendered on the dark setup panel
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
-                super.getView(position, convertView, parent).apply {
-                    (this as? android.widget.TextView)?.setTextColor(Color.WHITE)
-                }
-        }
-        binding.fileTypeSpinner.setSelection(FILE_EXTENSIONS.indexOf(fileExt).coerceAtLeast(0))
-        binding.fileTypeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                val ext = FILE_EXTENSIONS[position]
-                if (ext != fileExt) {
-                    getPreferences(MODE_PRIVATE).edit().putString(PREF_FILE_EXT, ext).apply()
-                    reloadFolder()
-                }
+        binding.fileTypeSpinner.adapter =
+            object : ArrayAdapter<String>(
+                this,
+                android.R.layout.simple_spinner_dropdown_item,
+                FILE_EXTENSIONS.map { it.uppercase() },
+            ) {
+                // The selected item is rendered on the dark setup panel
+                override fun getView(
+                    position: Int,
+                    convertView: View?,
+                    parent: ViewGroup,
+                ): View =
+                    super.getView(position, convertView, parent).apply {
+                        (this as? android.widget.TextView)?.setTextColor(Color.WHITE)
+                    }
             }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
+        binding.fileTypeSpinner.setSelection(FILE_EXTENSIONS.indexOf(fileExt).coerceAtLeast(0))
+        binding.fileTypeSpinner.onItemSelectedListener =
+            object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long,
+                ) {
+                    val ext = FILE_EXTENSIONS[position]
+                    if (ext != fileExt) {
+                        getPreferences(MODE_PRIVATE).edit().putString(PREF_FILE_EXT, ext).apply()
+                        reloadFolder()
+                    }
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) {}
+            }
         binding.groupCodeEdit.setText(groupCode)
         binding.groupCodeEdit.doAfterTextChanged { text ->
             getPreferences(MODE_PRIVATE).edit().putString(PREF_GROUP_CODE, text.toString().trim()).apply()
@@ -405,21 +432,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent?,
+    ): Boolean {
         // Page-turn pedals typically emulate volume, arrow or page keys
         if ((pdfRenderer != null || isImageDoc) && !binding.setupControls.isVisible) {
             when (keyCode) {
                 KeyEvent.KEYCODE_VOLUME_DOWN,
                 KeyEvent.KEYCODE_DPAD_RIGHT,
                 KeyEvent.KEYCODE_DPAD_DOWN,
-                KeyEvent.KEYCODE_PAGE_DOWN -> {
+                KeyEvent.KEYCODE_PAGE_DOWN,
+                -> {
                     navigateNextPage()
                     return true
                 }
                 KeyEvent.KEYCODE_VOLUME_UP,
                 KeyEvent.KEYCODE_DPAD_LEFT,
                 KeyEvent.KEYCODE_DPAD_UP,
-                KeyEvent.KEYCODE_PAGE_UP -> {
+                KeyEvent.KEYCODE_PAGE_UP,
+                -> {
                     navigatePrevPage()
                     return true
                 }
@@ -477,15 +509,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         val fileNames = pdfFiles.map { getFileName(it) ?: "Unknown" }.toTypedArray()
-        
-        AlertDialog.Builder(this)
+
+        AlertDialog
+            .Builder(this)
             .setTitle("Select file")
             .setSingleChoiceItems(fileNames, currentPdfIndex) { dialog, which ->
                 currentPdfIndex = which
                 openPdf(pdfFiles[which])
                 dialog.dismiss()
-            }
-            .show()
+            }.show()
     }
 
     private fun toggleFullScreen() {
@@ -514,17 +546,24 @@ class MainActivity : AppCompatActivity() {
             window.setDecorFitsSystemWindows(false)
             val controller = window.insetsController
             if (controller != null) {
-                controller.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+                controller.hide(
+                    android.view.WindowInsets.Type
+                        .statusBars() or
+                        android.view.WindowInsets.Type
+                            .navigationBars(),
+                )
                 controller.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         } else {
             @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_IMMERSIVE
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_IMMERSIVE
                     or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                     or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                     or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                     or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_FULLSCREEN)
+                    or View.SYSTEM_UI_FLAG_FULLSCREEN
+            )
         }
     }
 
@@ -532,12 +571,19 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(true)
             val controller = window.insetsController
-            controller?.show(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+            controller?.show(
+                android.view.WindowInsets.Type
+                    .statusBars() or
+                    android.view.WindowInsets.Type
+                        .navigationBars(),
+            )
         } else {
             @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                     or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)
+                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            )
         }
     }
 
@@ -581,7 +627,18 @@ class MainActivity : AppCompatActivity() {
         }
         val wantedMime = if (fileExt == "jpg") "image/jpeg" else "application/pdf"
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folderUri, DocumentsContract.getTreeDocumentId(folderUri))
-        val cursor = contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)
+        val cursor =
+            contentResolver.query(
+                childrenUri,
+                arrayOf(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE,
+                ),
+                null,
+                null,
+                null,
+            )
 
         val docs = mutableListOf<Uri>()
         cursor?.use {
@@ -618,11 +675,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun displayImage(uri: Uri, name: String) {
+    private fun displayImage(
+        uri: Uri,
+        name: String,
+    ) {
         try {
-            var bitmap = contentResolver.openInputStream(uri)?.use {
-                android.graphics.BitmapFactory.decodeStream(it)
-            } ?: return
+            var bitmap =
+                contentResolver.openInputStream(uri)?.use {
+                    android.graphics.BitmapFactory.decodeStream(it)
+                } ?: return
             if (cropMargins) {
                 bitmap = cropPrintedBorder(bitmap)
             }
@@ -647,7 +708,7 @@ class MainActivity : AppCompatActivity() {
         bluetoothController.startServer()
         midiController.start(groupCode)
         binding.statusText.text = getString(R.string.status_server_started)
-        
+
         if (pdfRenderer != null || isImageDoc) {
             binding.setupControls.isVisible = false
             showReadingControls()
@@ -672,14 +733,13 @@ class MainActivity : AppCompatActivity() {
         binding.pdfImageView.isVisible = false
         binding.receivedPageText.isVisible = true
         binding.receivedPageText.text = getString(R.string.client_waiting)
-        
+
         binding.setupControls.isVisible = false
         showReadingControls()
         hideSystemUI()
 
         Toast.makeText(this, "BLE Client Started", Toast.LENGTH_SHORT).show()
     }
-
 
     private fun loadPDF(uri: Uri) {
         Log.d(tag, "Loading PDF: $uri")
@@ -725,7 +785,7 @@ class MainActivity : AppCompatActivity() {
 
                 val fileName = currentPdfIndex.takeIf { it >= 0 }?.let { getFileName(pdfFiles[it]) } ?: "Unknown"
                 binding.readingPageInfo.text = getString(R.string.page_info, fileName, pageIndex + 1, renderer.pageCount)
-                
+
                 if (isServer) {
                     bluetoothController.sendPdfNameViaAdvertisement(fileName, pageIndex)
                 }
@@ -739,10 +799,11 @@ class MainActivity : AppCompatActivity() {
     // page margins so the printed area can use the whole screen
     private fun cropPrintedBorder(src: Bitmap): Bitmap {
         val row = IntArray(src.width)
-        val bounds = CropMargins.computeContentBounds(src.width, src.height) { y ->
-            src.getPixels(row, 0, src.width, 0, y, src.width, 1)
-            row
-        } ?: return src
+        val bounds =
+            CropMargins.computeContentBounds(src.width, src.height) { y ->
+                src.getPixels(row, 0, src.width, 0, y, src.width, 1)
+                row
+            } ?: return src
         return Bitmap.createBitmap(src, bounds.x, bounds.y, bounds.width, bounds.height)
     }
 
@@ -767,10 +828,11 @@ class MainActivity : AppCompatActivity() {
         }
         return result
     }
-    
+
     private fun showDebugLog() {
         val log = bluetoothController.bleEvents.joinToString("\n")
-        AlertDialog.Builder(this)
+        AlertDialog
+            .Builder(this)
             .setTitle("BLE Debug Log")
             .setMessage(log)
             .setPositiveButton("OK", null)
@@ -778,25 +840,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestPermissions() {
-        val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_ADVERTISE,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
-        } else {
-            arrayOf(
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            )
-        }
+        val permissionsToRequest =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                arrayOf(
+                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH_ADVERTISE,
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                )
+            } else {
+                arrayOf(
+                    Manifest.permission.BLUETOOTH,
+                    Manifest.permission.BLUETOOTH_ADMIN,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                )
+            }
 
-        val permissionsNotGranted = permissionsToRequest.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
+        val permissionsNotGranted =
+            permissionsToRequest.filter {
+                ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+            }
 
         if (permissionsNotGranted.isNotEmpty()) {
             requestPermissionsLauncher.launch(permissionsNotGranted.toTypedArray())

@@ -181,14 +181,16 @@ class BleSyncTest(base_test.BaseTestClass):
         ad.adb.shell(['input', 'keyevent', 'KEYCODE_BACK'])
         time.sleep(1)
 
+    def _ui_contains(self, ad, text):
+        ad.adb.shell(['uiautomator', 'dump', '/data/local/tmp/ui.xml'])
+        dump = ad.adb.shell(['cat', '/data/local/tmp/ui.xml'])
+        return ('"%s"' % text).encode() in dump
+
     def _wait_for_ui_text(self, ad, text, screenshot_name):
         """Waits until `text` appears in the UI, saving a screenshot."""
-        needle = ('"%s"' % text).encode()
         deadline = time.time() + SYNC_TIMEOUT_S
         while time.time() < deadline:
-            ad.adb.shell(['uiautomator', 'dump', '/data/local/tmp/ui.xml'])
-            dump = ad.adb.shell(['cat', '/data/local/tmp/ui.xml'])
-            if needle in dump:
+            if self._ui_contains(ad, text):
                 self._save_screenshot(ad, screenshot_name)
                 return
             time.sleep(2)
@@ -230,17 +232,26 @@ class BleSyncTest(base_test.BaseTestClass):
         host, port = self._midi_endpoint(self.server)
         self._launch_app(self.server, 'server')
         emu = SongBookEmulator(host, port, 'Mobly MIDI test')
+        shown = False
         try:
             emu.connect()
-            emu.listen(1.0)  # answer the app's first clock sync round
-            # display value 14_20 -> wire values bank 13, program 19
-            emu.send_song_select(program=19, bank=13)
-            emu.listen(2.0)
+            emu.listen(2.0)  # answer the app's first clock sync round
+            # UDP has no delivery guarantee and the app may still be busy
+            # with clock sync: keep the session open and resend the
+            # selection until the UI shows it.
+            # Display value 14_20 -> wire values bank 13, program 19.
+            deadline = time.time() + SYNC_TIMEOUT_S
+            while not shown and time.time() < deadline:
+                emu.send_song_select(program=19, bank=13)
+                emu.listen(3.0)
+                shown = self._ui_contains(self.server, '14/20')
         finally:
             emu.disconnect()
         try:
-            self._wait_for_ui_text(self.server, '14/20',
-                                   'server_midi_number_display')
+            name = 'server_midi_number_display' + ('' if shown else '_FAILED')
+            self._save_screenshot(self.server, name)
+            asserts.assert_true(
+                shown, 'Server UI never showed "14/20" after MIDI song select.')
         finally:
             self._close_app(self.server)
 

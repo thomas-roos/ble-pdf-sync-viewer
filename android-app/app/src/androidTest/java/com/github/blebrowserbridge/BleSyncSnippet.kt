@@ -14,7 +14,6 @@ import java.util.Collections
  * emulator's virtual radio in CI).
  */
 class BleSyncSnippet : Snippet {
-
     private val controller =
         BluetoothController(InstrumentationRegistry.getInstrumentation().targetContext)
 
@@ -40,7 +39,10 @@ class BleSyncSnippet : Snippet {
     }
 
     @Rpc(description = "Advertise the given file name and page index (server role).")
-    fun broadcast(pdfName: String, pageIndex: Int) {
+    fun broadcast(
+        pdfName: String,
+        pageIndex: Int,
+    ) {
         controller.sendPdfNameViaAdvertisement(pdfName, pageIndex)
     }
 

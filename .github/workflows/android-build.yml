@@ -64,10 +64,10 @@ jobs:
         cd android-app
         ./gradlew clean
 
-    - name: Run unit tests
+    - name: Run style checks, lint and unit tests
       run: |
         cd android-app
-        ./gradlew :app:testDebugUnitTest --stacktrace
+        ./gradlew :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest --stacktrace
 
     - name: Build debug APK
       run: |

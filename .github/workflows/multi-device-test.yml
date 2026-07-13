@@ -58,12 +58,12 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    # Fail fast on the cheap tests before booting any emulator
-    - name: Run unit tests
+    # Fail fast on the cheap checks before booting any emulator
+    - name: Run style checks and unit tests
       run: |
         cd android-app
         chmod +x gradlew
-        ./gradlew :app:testDebugUnitTest --stacktrace
+        ./gradlew :app:ktlintCheck :app:testDebugUnitTest --stacktrace
 
     - name: Build app and snippet APKs
       run: |

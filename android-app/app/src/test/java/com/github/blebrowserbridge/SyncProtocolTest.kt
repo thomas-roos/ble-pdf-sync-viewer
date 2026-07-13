@@ -8,7 +8,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SyncProtocolTest {
-
     private val tag = SyncProtocol.deriveGroupTag("bandA")
 
     @Test

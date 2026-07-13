@@ -17,10 +17,19 @@ RTP MIDI (AppleMIDI). See README.md for features and usage.
   plain JUnit test under `android-app/app/src/test/`. Keep such logic in
   Android-free objects (`SyncProtocol`, `CropMargins`) so it stays testable.
 
-**Always run the unit tests before committing**:
-`cd android-app && ./gradlew :app:testDebugUnitTest`. The repo ships a
-pre-commit hook for this — enable it once per clone with
+**Always run style checks, lint and unit tests before committing**:
+`cd android-app && ./gradlew :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest`.
+The repo ships a pre-commit hook for this — enable it once per clone with
 `git config core.hooksPath hooks`.
+
+Style and warnings policy (app module only, the vendored `midi/` module is
+exempt): Kotlin compiler warnings are errors (`allWarningsAsErrors`), code
+style is ktlint (`ktlintFormat` auto-fixes), Android Lint runs with
+`warningsAsErrors` — pre-existing findings are frozen in
+`app/lint-baseline.xml` (worth burning down over time), and the
+"newer version available" checks are disabled because they break CI when
+upstream releases something. The app uses AGP 9's built-in Kotlin — do not
+re-add the `org.jetbrains.kotlin.android` plugin.
 
 If a feature needs app cooperation to be testable, prefer small explicit
 hooks (like the `autostart` intent extra in `MainActivity`) over UI

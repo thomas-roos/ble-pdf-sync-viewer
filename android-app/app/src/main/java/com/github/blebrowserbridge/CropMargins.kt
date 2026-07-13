@@ -7,12 +7,20 @@ package com.github.blebrowserbridge
  * Pure logic with no Android dependencies - unit-tested in CropMarginsTest.
  */
 object CropMargins {
-    data class Bounds(val x: Int, val y: Int, val width: Int, val height: Int)
+    data class Bounds(
+        val x: Int,
+        val y: Int,
+        val width: Int,
+        val height: Int,
+    )
 
     fun isContent(pixel: Int): Boolean =
         (pixel ushr 24) > 0x80 &&
-                ((pixel shr 16 and 0xFF) < 235 || (pixel shr 8 and 0xFF) < 235 ||
-                        (pixel and 0xFF) < 235)
+            (
+                (pixel shr 16 and 0xFF) < 235 ||
+                    (pixel shr 8 and 0xFF) < 235 ||
+                    (pixel and 0xFF) < 235
+            )
 
     /**
      * Returns the padded content bounding box, or null when the page is
@@ -22,10 +30,13 @@ object CropMargins {
     fun computeContentBounds(
         width: Int,
         height: Int,
-        rowPixels: (Int) -> IntArray
+        rowPixels: (Int) -> IntArray,
     ): Bounds? {
         val step = maxOf(1, width / 300)
-        var minX = width; var minY = height; var maxX = -1; var maxY = -1
+        var minX = width
+        var minY = height
+        var maxX = -1
+        var maxY = -1
 
         for (y in 0 until height step step) {
             val row = rowPixels(y)

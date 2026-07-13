@@ -10,8 +10,13 @@ import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
 
-class MidiController(private val context: Context) {
-    private val TAG = "MidiController"
+class MidiController(
+    private val context: Context,
+) {
+    companion object {
+        private const val TAG = "MidiController"
+    }
+
     private var multicastLock: WifiManager.MulticastLock? = null
     private var midiSession: MIDISession? = null
 
@@ -24,7 +29,7 @@ class MidiController(private val context: Context) {
 
     fun start(groupCode: String = "") {
         Log.i(TAG, "Starting MIDI Controller")
-        
+
         val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         multicastLock = wifi.createMulticastLock("MidiMulticastLock")
         multicastLock?.setReferenceCounted(true)
@@ -36,8 +41,12 @@ class MidiController(private val context: Context) {
 
         try {
             midiSession = MIDISession.getInstance()
-            val sessionName = if (groupCode.isEmpty()) "pdf-sync-viewer"
-                              else "pdf-sync-viewer-$groupCode"
+            val sessionName =
+                if (groupCode.isEmpty()) {
+                    "pdf-sync-viewer"
+                } else {
+                    "pdf-sync-viewer-$groupCode"
+                }
             midiSession?.setBonjourName(sessionName)
             midiSession?.start(context)
             Log.d(TAG, "MIDI Session started")
@@ -68,10 +77,11 @@ class MidiController(private val context: Context) {
         Log.d(TAG, "Received MIDI Event: cmd=$command, note=$note, vel=$velocity")
 
         when (command) {
-            0x0B -> when (note) { // Control Change: remember bank select
-                0 -> bankMsb = velocity
-                32 -> bankLsb = velocity
-            }
+            0x0B ->
+                when (note) { // Control Change: remember bank select
+                    0 -> bankMsb = velocity
+                    32 -> bankLsb = velocity
+                }
             // Program Change selects a song (SongBook sends bank select + program change)
             0x0C -> onSongSelectRequested?.invoke(bankMsb * 128 + bankLsb, note)
             // Note On turns to an absolute page within the current PDF

@@ -21,14 +21,15 @@ import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
 
-class BluetoothController(private val context: Context) {
-
+class BluetoothController(
+    private val context: Context,
+) {
     private val bluetoothManager: BluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
-    
-    private val advertiser: BluetoothLeAdvertiser? 
+
+    private val advertiser: BluetoothLeAdvertiser?
         get() = bluetoothAdapter?.bluetoothLeAdvertiser
-    private val scanner: BluetoothLeScanner? 
+    private val scanner: BluetoothLeScanner?
         get() = bluetoothAdapter?.bluetoothLeScanner
 
     private val handler = Handler(Looper.getMainLooper())
@@ -46,15 +47,13 @@ class BluetoothController(private val context: Context) {
 
     var onPdfNameReceived: ((String, Int) -> Unit)? = null
     val bleEvents = mutableListOf<String>()
-    
+
     private var lastReceivedPdfName: String? = null
     private var lastReceivedPageIndex: Int = -1
     private var lastReceivedCounter: Byte = -1
     private var advertisementCounter: Byte = (System.currentTimeMillis() % 128).toByte()
 
-    fun isBluetoothEnabled(): Boolean {
-        return bluetoothAdapter?.isEnabled == true
-    }
+    fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
 
     fun startServer() {
         Log.d(TAG, "Starting BLE Server")
@@ -62,12 +61,15 @@ class BluetoothController(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    fun sendPdfNameViaAdvertisement(pdfName: String, pageIndex: Int) {
+    fun sendPdfNameViaAdvertisement(
+        pdfName: String,
+        pageIndex: Int,
+    ) {
         if (!hasAdvertisePermission()) {
             bleEvents.add("ERROR: Missing advertising permission.")
             return
         }
-        
+
         advertisementCounter++
         Log.d(TAG, "Updating advertisement: $pdfName:$pageIndex (v$advertisementCounter)")
         bleEvents.add("Advertising PDF: $pdfName:$pageIndex (v$advertisementCounter)")
@@ -86,19 +88,27 @@ class BluetoothController(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    private fun startAdvertisingInternal(pdfName: String, counter: Byte, pageIndex: Int) {
-        val settings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-            .setConnectable(false)
-            .build()
+    private fun startAdvertisingInternal(
+        pdfName: String,
+        counter: Byte,
+        pageIndex: Int,
+    ) {
+        val settings =
+            AdvertiseSettings
+                .Builder()
+                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+                .setConnectable(false)
+                .build()
 
         val dataBytes = SyncProtocol.encode(groupTag, counter, pageIndex, pdfName)
 
-        val data = AdvertiseData.Builder()
-            .setIncludeDeviceName(false)
-            .addManufacturerData(MANUFACTURER_ID, dataBytes)
-            .build()
+        val data =
+            AdvertiseData
+                .Builder()
+                .setIncludeDeviceName(false)
+                .addManufacturerData(MANUFACTURER_ID, dataBytes)
+                .build()
 
         try {
             advertiser?.startAdvertising(settings, data, advertiseCallback)
@@ -117,19 +127,23 @@ class BluetoothController(private val context: Context) {
         Log.d(TAG, "Starting BLE Client")
         lastReceivedPdfName = null
         lastReceivedCounter = -1
-        
+
         // Firmware-level filter: only advertisements whose manufacturer data
         // starts with our group tag reach the callback (the filter compares
         // just the tag-length prefix)
         val filterMask = ByteArray(SyncProtocol.GROUP_TAG_SIZE) { 0xFF.toByte() }
-        val scanFilters = listOf(
-            ScanFilter.Builder()
-                .setManufacturerData(MANUFACTURER_ID, groupTag.copyOf(), filterMask)
-                .build()
-        )
-        val scanSettingsBuilder = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-            
+        val scanFilters =
+            listOf(
+                ScanFilter
+                    .Builder()
+                    .setManufacturerData(MANUFACTURER_ID, groupTag.copyOf(), filterMask)
+                    .build(),
+            )
+        val scanSettingsBuilder =
+            ScanSettings
+                .Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             scanSettingsBuilder.setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
             scanSettingsBuilder.setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
@@ -138,7 +152,7 @@ class BluetoothController(private val context: Context) {
         try {
             scanner?.startScan(scanFilters, scanSettingsBuilder.build(), scanCallback)
             bleEvents.add("Client scan started.")
-        } catch(e: Exception) {
+        } catch (e: Exception) {
             Log.e(TAG, "Error starting scan", e)
             bleEvents.add("ERROR: Start scan failed.")
         }
@@ -152,55 +166,62 @@ class BluetoothController(private val context: Context) {
             if (hasAdvertisePermission()) advertiser?.stopAdvertising(advertiseCallback)
             if (hasScanPermission()) scanner?.stopScan(scanCallback)
             bleEvents.add("BLE operations stopped.")
-        } catch(e: Exception) {
+        } catch (e: Exception) {
             Log.e(TAG, "Error stopping BLE", e)
         }
     }
 
-    private fun hasAdvertisePermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    private fun hasAdvertisePermission(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED
-        } else true
-    }
+        } else {
+            true
+        }
 
-    private fun hasScanPermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    private fun hasScanPermission(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
-        } else true
-    }
-
-    private val advertiseCallback = object : AdvertiseCallback() {
-        override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-            Log.d(TAG, "Advertising started successfully")
+        } else {
+            true
         }
 
-        override fun onStartFailure(errorCode: Int) {
-            Log.e(TAG, "Advertising failure: $errorCode")
-            bleEvents.add("Advertising failure: $errorCode")
-        }
-    }
+    private val advertiseCallback =
+        object : AdvertiseCallback() {
+            override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+                Log.d(TAG, "Advertising started successfully")
+            }
 
-    private val scanCallback = object : ScanCallback() {
-        override fun onScanResult(callbackType: Int, result: ScanResult?) {
-            result?.scanRecord?.getManufacturerSpecificData(MANUFACTURER_ID)?.let { data ->
-                // decode() re-checks the group tag in case the firmware
-                // filter was not applied
-                val update = SyncProtocol.decode(groupTag, data) ?: return
-                val (pdfName, pageIndex, counter) = update
-                if (pdfName != lastReceivedPdfName || pageIndex != lastReceivedPageIndex || counter != lastReceivedCounter) {
-                    lastReceivedPdfName = pdfName
-                    lastReceivedPageIndex = pageIndex
-                    lastReceivedCounter = counter
-                    Log.d(TAG, "Received update: $pdfName:$pageIndex (v$counter)")
-                    bleEvents.add("Received update: $pdfName:$pageIndex (v$counter)")
-                    onPdfNameReceived?.invoke(pdfName, pageIndex)
-                }
+            override fun onStartFailure(errorCode: Int) {
+                Log.e(TAG, "Advertising failure: $errorCode")
+                bleEvents.add("Advertising failure: $errorCode")
             }
         }
 
-        override fun onScanFailed(errorCode: Int) {
-            Log.e(TAG, "Scan failed: $errorCode")
-            bleEvents.add("Scan failure: $errorCode")
+    private val scanCallback =
+        object : ScanCallback() {
+            override fun onScanResult(
+                callbackType: Int,
+                result: ScanResult?,
+            ) {
+                result?.scanRecord?.getManufacturerSpecificData(MANUFACTURER_ID)?.let { data ->
+                    // decode() re-checks the group tag in case the firmware
+                    // filter was not applied
+                    val update = SyncProtocol.decode(groupTag, data) ?: return
+                    val (pdfName, pageIndex, counter) = update
+                    if (pdfName != lastReceivedPdfName || pageIndex != lastReceivedPageIndex || counter != lastReceivedCounter) {
+                        lastReceivedPdfName = pdfName
+                        lastReceivedPageIndex = pageIndex
+                        lastReceivedCounter = counter
+                        Log.d(TAG, "Received update: $pdfName:$pageIndex (v$counter)")
+                        bleEvents.add("Received update: $pdfName:$pageIndex (v$counter)")
+                        onPdfNameReceived?.invoke(pdfName, pageIndex)
+                    }
+                }
+            }
+
+            override fun onScanFailed(errorCode: Int) {
+                Log.e(TAG, "Scan failed: $errorCode")
+                bleEvents.add("Scan failure: $errorCode")
+            }
         }
-    }
 }
