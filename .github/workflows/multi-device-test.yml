@@ -58,10 +58,16 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    - name: Build app and snippet APKs
+    # Fail fast on the cheap tests before booting any emulator
+    - name: Run unit tests
       run: |
         cd android-app
         chmod +x gradlew
+        ./gradlew :app:testDebugUnitTest --stacktrace
+
+    - name: Build app and snippet APKs
+      run: |
+        cd android-app
         ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
 
     - name: Create two AVDs
