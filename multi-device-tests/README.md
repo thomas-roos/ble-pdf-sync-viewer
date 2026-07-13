@@ -16,6 +16,12 @@ actually arrives over the air:
   screenshots of the client are saved to `SCREENSHOT_DIR` (or the Mobly log
   dir) and uploaded as a `screenshots` artifact in CI
 
+<img src="../docs/screenshots/test-number-display.png" width="280"
+  alt="Client tablet showing 7/3 fullscreen during the UI test">
+
+*Captured by the UI test: the client device (no files selected) displaying
+`7/3` after the server broadcast `7_3.pdf`.*
+
 ## How it works
 
 - `android-app/app/src/androidTest/.../BleSyncSnippet.kt` is a
